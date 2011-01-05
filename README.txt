@@ -10,6 +10,8 @@ http://dev.hubspot.com/bid/57694/Git-by-a-Bus
 
 ## Bugs
 
+Known not to work currently across symlinks.
+
 If you find any, let me know on github or by email at {first
 initial}{last name}@{my company}.com, all lowercase.
 

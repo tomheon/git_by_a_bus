@@ -147,7 +147,8 @@ if __name__ == '__main__':
 
                Analyze each git controlled path and create an html summary of orphaned / at-risk code knowledge.
 
-               Paths must be absolute paths to local git-controlled directories (they may be subdirs in the git repo).
+               Paths must be absolute paths to local git-controlled directories (they may be subdirs in the git repo).  Currently
+               symlinked paths are not supported.
                
                Project names are optional and default to the last directory in the path.
 
