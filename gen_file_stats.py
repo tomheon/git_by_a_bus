@@ -39,7 +39,9 @@ if __name__ == '__main__':
     path_project = args[0].split('=')
 
     project = None
-    root = path_project[0]
+
+    # handle symlinked directories, which git doesn't like.
+    root = os.path.realpath(path_project[0])
 
     if len(path_project) > 1:
         project = path_project[1]
