@@ -1,5 +1,13 @@
 # Git by a Bus: Estimate unique and at-risk knowledge in your source code.
 
+## History
+
+Git by a Bus was developed at HubSpot.
+
+Motivation and description of the algorithm are here:
+
+http://dev.hubspot.com/bid/57694/Git-by-a-Bus
+
 ## Bugs
 
 If you find any, let me know on github or by email at {first
