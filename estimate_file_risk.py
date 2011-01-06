@@ -48,6 +48,7 @@ def parse_risk_file(risk_file, bus_risks):
         if not line:
             continue
         dev, risk = line.split('=')
+        dev = dev.replace(',', '_').replace(':', '_')
         bus_risks[dev] = float(risk)
     risk_f.close()
 
