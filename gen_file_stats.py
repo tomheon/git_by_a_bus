@@ -41,7 +41,11 @@ if __name__ == '__main__':
     project = None
 
     # handle symlinked directories, which git doesn't like.
-    root = os.path.realpath(path_project[0])
+    # but don't use them for svn.
+    if not options.use_svn:
+        root = os.path.realpath(path_project[0])
+    else:
+        root = path_project[0]
 
     if len(path_project) > 1:
         project = path_project[1]
