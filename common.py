@@ -2,6 +2,12 @@
 Common and other crappy code used throughout git by a bus.
 """
 
+def safe_author_name(author):
+    if author:
+        return author.replace(',', '_').replace(':', '_')
+    else:
+        return author
+
 def safe_int(i):
     if i is None or i == '':
         return None
@@ -113,7 +119,7 @@ def parse_departed_devs(dd_file, departed_devs):
     fil = open(dd_file, 'r')
     for line in fil:
         line = line.strip()
-        line = line.replace(',', '_').replace(':', '_')
+        line = safe_author_name(line)
         if not line:
             continue
         departed_devs.append(line)

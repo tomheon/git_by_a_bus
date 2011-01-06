@@ -14,7 +14,7 @@ import re
 
 import pysvn
 
-from common import is_interesting, FileData
+from common import is_interesting, FileData, safe_author_name
 
 def gen_stats(root, project, interesting, not_interesting, options):
     """
@@ -141,7 +141,7 @@ def parse_dev_experience(f, client, repo_root):
                     added += 1
                 if line.startswith('-'):
                     removed += 1
-            dev_experience.append((author, added, removed))
+            dev_experience.append((safe_author_name(author), added, removed))
         except:
             # on one occasion I saw a non-binary item that existed in
             # the filesystem with svn ls but errored out with a diff

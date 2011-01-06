@@ -12,7 +12,7 @@ carpoolers.
 import sys
 import optparse
 
-from common import FileData
+from common import FileData, safe_author_name
 
 def get_bus_risk(dev, bus_risks, def_risk):
     if dev not in bus_risks:
@@ -48,7 +48,7 @@ def parse_risk_file(risk_file, bus_risks):
         if not line:
             continue
         dev, risk = line.split('=')
-        dev = dev.replace(',', '_').replace(':', '_')
+        dev = safe_author_name(dev)
         bus_risks[dev] = float(risk)
     risk_f.close()
 
