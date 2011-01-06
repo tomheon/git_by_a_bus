@@ -281,10 +281,15 @@ def summarize_top_by_valtype(agg_by_single, noun, linker, limit):
         html.extend(by_valtype_html(valtype, nouns, noun, linker, limit))
     return html
 
+def add_global_explanation(html):
+    html.append('<p>Note: values smaller than %d have been truncated in the interest of space.</p>' % GLOBAL_CUTOFF)
+    html.append('<p>Note: the scale of the bars is relative only within, not across, tables.</p>')
+
 def create_index(aggs, output_dir):
     html = []
     html.append("<html>\n<head><title>Git By a Bus Summary Results</title></head>\n<body>")
     html.append("<h1>Git by a Bus Summary Results</h1>")
+    add_global_explanation(html)
     html.extend(summarize_top_by_valtype(aggs[(a_valtype, a_project)], 'Projects', project_linker, 100))
     html.extend(summarize_top_by_valtype(aggs[(a_valtype, a_dev)], 'Devs', dev_linker, 100))
     html.extend(summarize_top_by_valtype(aggs[(a_valtype, a_fname)], 'Files', fname_linker, 100))
@@ -298,6 +303,7 @@ def create_detail_page(detail, noun, valtype_args, fname, custom_lines_f):
     html.append("<html>\n<head><title>Git By a Bus Summary Results for %s: %s</title></head>\n<body>" % (noun, detail))
     html.append("<p><a href=\"../index.html\">Index</a></p>")
     html.append("<h1>Git by a Bus Summary Results for %s: %s</h1>" % (noun, detail))
+    add_global_explanation(html)
     if custom_lines_f:
         html.extend(custom_lines_f(detail, noun, valtype_args, fname))
     for vtarg in valtype_args:
