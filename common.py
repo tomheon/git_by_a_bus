@@ -113,6 +113,7 @@ def parse_departed_devs(dd_file, departed_devs):
     fil = open(dd_file, 'r')
     for line in fil:
         line = line.strip()
+        line = line.replace(',', '_').replace(':', '_')
         if not line:
             continue
         departed_devs.append(line)

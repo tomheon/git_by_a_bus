@@ -84,6 +84,7 @@ def parse_experience(log):
                 print >> sys.stderr, "Weird entry, cannot parse: %s\n-----" % '\n'.join(local_entry)
                 continue
             author, changes = local_entry[:2]
+            author = author.replace(',', '_').replace(':', '_')
             try:
                 changes_split = re.split(r'\s+', changes)
                 # this can be two fields if there were file renames
