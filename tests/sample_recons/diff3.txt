@@ -1,0 +1,29 @@
+diff --git a/git_by_a_bus/git_by_a_bus.py b/git_by_a_bus/git_by_a_bus.py
+index 8264b1a..628e890 100644
+--- a/git_by_a_bus/git_by_a_bus.py
++++ b/git_by_a_bus/git_by_a_bus.py
+@@ -91,20 +91,15 @@ def run_estimate_file_risk(python_cmd, output_dir, unique_knowledge_fname, bus_r
+     return output_fname
+ 
+ def run_summarize(python_cmd, output_dir, estimated_risk_fname):
+-    output_fname = os.path.join(output_dir, 'index.html')
+-    output_fil = open(output_fname, 'w')
+-
+     input_fil = open(estimated_risk_fname, 'r')
+     
+-    cmd_t = Template('${python_cmd} summarize.py')
+-    cmd = cmd_t.substitute(python_cmd=python_cmd).split(' ')
+-    cmd_p = Popen(cmd, stdout=output_fil, stdin=input_fil)
++    cmd_t = Template('${python_cmd} summarize.py ${output_dir}')
++    cmd = cmd_t.substitute(python_cmd=python_cmd,
++                           output_dir=output_dir).split(' ')
++    cmd_p = Popen(cmd, stdin=input_fil)
+     cmd_p.communicate()
+ 
+-    output_fil.close()
+     input_fil.close()
+-
+-    return output_fname
+     
+ def main(paths_projects, options):
+     python_cmd = '/usr/bin/env python'

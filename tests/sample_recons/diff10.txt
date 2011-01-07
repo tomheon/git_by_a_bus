@@ -1,0 +1,51 @@
+diff --git a/git_by_a_bus/git_by_a_bus.py b/git_by_a_bus/git_by_a_bus.py
+index 31a4579..a066c64 100644
+--- a/git_by_a_bus/git_by_a_bus.py
++++ b/git_by_a_bus/git_by_a_bus.py
+@@ -82,10 +82,16 @@ def main(python_cmd, paths_projects, options):
+     if options.case_sensitive:
+         case_sensitive_option = '--case-sensitive'
+ 
++    svn_option = ''
++    if options.use_svn:
++        svn_option = '--svn'
++
++    git_exe_option = "--git-exe %s" % options.git_exe
++
+     # commands to chain together
+     cmd_ts = []
+     cmd_ts.append([None, 'gen_file_stats.py',
+-                   ['${interesting_file_option} ${not_interesting_file_option} ${case_sensitive_option} %s' % path_project \
++                   ['${interesting_file_option} ${not_interesting_file_option} ${case_sensitive_option} ${git_exe_option} ${svn_option} %s' % path_project \
+                     for path_project in paths_projects]])
+     cmd_ts.append(['gen_file_stats.py', 'calc_file_knowledge_totals.py'])
+     cmd_ts.append(['calc_file_knowledge_totals.py', 'estimate_unique_knowledge.py', '${departed_dev_option}'])
+@@ -132,7 +138,7 @@ if __name__ == '__main__':
+     parser.add_option('-i', '--interesting', metavar="REGEXP", dest='interesting', action='append',
+                       help='Regular expression to determine which files should be included in calculations.  ' + \
+                       'May be repeated, any match is sufficient to indicate interest. ' + \
+-                      'Defaults are \.java$ \.cs$ \.python$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.rb$', default=[])
++                      'Defaults are \.java$ \.cs$ \.py$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.rb$', default=[])
+     parser.add_option('-n', '--not-interesting', metavar="REGEXP", dest="not_interesting", action='append', default=[],
+                       help="Regular expression to override interesting files.  May be repeated, any match is enough to squelch interest.")
+     parser.add_option('--case-sensitive', dest='case_sensitive', action='store_true', default=False,
+@@ -146,6 +152,12 @@ if __name__ == '__main__':
+     parser.add_option('-c', '--continue-last', dest='continue_last', default=False, action="store_true",
+                       help="Continue last run, using existing output files and recreating missing.")
+     parser.add_option('-v', '--verbose', dest='verbose', default=False, action="store_true", help="Print debugging info")
++    parser.add_option('--python-exe', dest='python_exe', default='/usr/bin/env python',
++                      help='Path to the python interpreter (defaults to "/usr/bin/env python")')
++    parser.add_option('--git-exe', dest='git_exe', default='/usr/bin/env git',
++                      help='Path to the git exe (defaults to "/usr/bin/env git")')
++    parser.add_option('--svn', dest='use_svn', default=False, action='store_true',
++                      help='Use svn intead of git to generate file statistics.  This requires you to install pysvn.')
+ 
+     options, paths_projects = parser.parse_args()
+ 
+@@ -156,5 +168,5 @@ if __name__ == '__main__':
+     if not paths_projects:
+         parser.error('No paths/projects!  You must either specify paths/projects on the command line and/or in a file with the -p option.')
+     
+-    main('/usr/bin/env python', paths_projects, options)
++    main(options.python_exe, paths_projects, options)
+  

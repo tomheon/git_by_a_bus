@@ -1,0 +1,159 @@
+import sys
+import os
+
+from optparse import OptionParser
+from subprocess import Popen
+from string import Template
+
+def exit_with_error(err):
+    print >> sys.stderr, "Error: " + err
+    exit(1)
+
+def read_projects_file(fname, paths_projects):
+    try:
+        fil = open(fname, 'r')
+        paths_projects.extend([line.strip() for line in fil if line.strip()])
+        fil.close()
+        return True
+    except IOError:
+        return False
+
+def run_gen_file_stats(python_cmd, output_dir):
+    output_fname = os.path.join(output_dir, '__file_stats.txt')
+    output_fil = open(output_fname, 'w')
+    
+    for path_project in paths_projects:
+        cmd_t = Template('${python_cmd} gen_file_stats.py ${path_project}')
+        cmd = cmd_t.substitute(python_cmd=python_cmd, path_project=path_project).split(' ')
+        cmd_p = Popen(cmd, stdout=output_fil)
+        cmd_p.communicate()
+
+    output_fil.close()
+
+    return output_fname
+
+def run_calc_file_knowledge_totals(python_cmd, output_dir, file_stats_fname):
+    output_fname = os.path.join(output_dir, '__file_knowledge_totals.txt')
+    output_fil = open(output_fname, 'w')
+
+    input_fil = open(file_stats_fname, 'r')
+    
+    cmd_t = Template('${python_cmd} calc_file_knowledge_totals.py')
+    cmd = cmd_t.substitute(python_cmd=python_cmd).split(' ')
+    cmd_p = Popen(cmd, stdout=output_fil, stdin=input_fil)
+    cmd_p.communicate()
+
+    output_fil.close()
+    input_fil.close()
+
+    return output_fname
+
+def run_estimate_unique_knowledge(python_cmd, output_dir, file_knowlegde_fname, departed_dev_file):
+    output_fname = os.path.join(output_dir, '__unique_knowledge.txt')
+    output_fil = open(output_fname, 'w')
+
+    input_fil = open(file_knowlegde_fname, 'r')
+    
+    departed_dev_option = ''
+    if departed_dev_file:
+        departed_dev_option = '-d %s' % departed_dev_file
+    
+    cmd_t = Template('${python_cmd} estimate_unique_knowledge.py ${departed_dev_option}')
+    cmd = cmd_t.substitute(python_cmd=python_cmd, departed_dev_option=departed_dev_option).split(' ')
+    cmd_p = Popen(cmd, stdout=output_fil, stdin=input_fil)
+    cmd_p.communicate()
+
+    output_fil.close()
+    input_fil.close()
+
+    return output_fname
+
+def run_estimate_file_risk(python_cmd, output_dir, unique_knowledge_fname, bus_risk, risk_file):
+    output_fname = os.path.join(output_dir, '__estimated_risk.txt')
+    output_fil = open(output_fname, 'w')
+
+    input_fil = open(unique_knowledge_fname, 'r')
+    
+    risk_file_option = ''
+    if risk_file:
+        risk_file_option = '-r %s' % risk_file
+    
+    cmd_t = Template('${python_cmd} estimate_file_risk.py -b ${bus_risk} ${risk_file_option}')
+    cmd = cmd_t.substitute(python_cmd=python_cmd,
+                           risk_file_option=risk_file_option,
+                           bus_risk=bus_risk).split(' ')
+    cmd_p = Popen(cmd, stdout=output_fil, stdin=input_fil)
+    cmd_p.communicate()
+
+    output_fil.close()
+    input_fil.close()
+
+    return output_fname
+
+def run_summarize(python_cmd, output_dir, estimated_risk_fname):
+    output_fname = os.path.join(output_dir, 'index.html')
+    output_fil = open(output_fname, 'w')
+
+    input_fil = open(estimated_risk_fname, 'r')
+    
+    cmd_t = Template('${python_cmd} summarize.py')
+    cmd = cmd_t.substitute(python_cmd=python_cmd).split(' ')
+    cmd_p = Popen(cmd, stdout=output_fil, stdin=input_fil)
+    cmd_p.communicate()
+
+    output_fil.close()
+    input_fil.close()
+
+    return output_fname
+    
+def main(paths_projects, options):
+    python_cmd = '/usr/bin/env python'
+    
+    output_dir = os.path.abspath(options.output or 'output')
+    try:
+        os.mkdir(output_dir)
+    except:
+        exit_with_error("Could not create directory %s" % output_dir)
+
+    file_stats_fname = run_gen_file_stats(python_cmd, output_dir)
+    file_knowlegde_fname = run_calc_file_knowledge_totals(python_cmd, output_dir, file_stats_fname)
+    unique_knowledge_fname = run_estimate_unique_knowledge(python_cmd, output_dir, file_knowlegde_fname, options.departed_dev_file)
+    estimated_risk_fname = run_estimate_file_risk(python_cmd, output_dir, unique_knowledge_fname, options.bus_risk, options.risk_file)
+    run_summarize(python_cmd, output_dir, estimated_risk_fname)
+    
+if __name__ == '__main__':
+    usage = """usage: %prog [options] [git_controlled_path1[=project_name1], git_controlled_path2[=project_name2],...]
+
+               Analyze each git controlled path and create an html summary of orphaned / at-risk code knowledge.
+
+               Paths must be absolute paths to local git-controlled directories (they may be subdirs in the git repo).
+               
+               Project names are optional and default to the last directory in the path.
+
+               You may alternatively/additionally specify the list of paths/projects in a file with -p."""
+    usage = '\n'.join([line.strip() for line in usage.split('\n')])
+
+    parser = OptionParser(usage=usage)
+    parser.add_option('-b', '--bus-risk', dest='bus_risk', metavar='FLOAT', default=0.1,
+                      help='The default estimated probability that a dev will be hit by a bus in your analysis timeframe (defaults to 0.1)')
+    parser.add_option('-r', '--risk-file', dest='risk_file', metavar='FILE',
+                      help='File of dev=float lines (e.g. ejorgensen=0.4) with custom bus risks for devs')
+    parser.add_option('-d', '--departed-dev-file', dest='departed_dev_file', metavar='FILE',
+                      help='File listing departed devs, one per line')
+    parser.add_option('-o', '--output', dest='output', metavar='DIRNAME', default='output',
+                      help='Output directory for data files and html summary, error if already exists (defaults to "output")')
+    parser.add_option('-p', '--projects-file', dest='projects_file', metavar='FILE',
+                      help='File of path[=project_name] lines, where path is an absoluate path to the git-controlled ' + \
+                      'directory to analyze and project_name is the name to use in the output summary (project_name defaults to ' + \
+                      'the last directory name in the path)')
+
+    options, paths_projects = parser.parse_args()
+
+    if options.projects_file:
+        if not read_projects_file(options.projects_file, paths_projects):
+            exit_with_error("Could not read projects file %s" % options.projects_file)
+
+    if not paths_projects:
+        parser.error('No paths/projects!  You must either specify paths/projects on the command line and/or in a file with the -p option.')
+    
+    main(paths_projects, options)

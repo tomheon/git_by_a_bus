@@ -1,0 +1,79 @@
+diff --git a/git_by_a_bus/git_by_a_bus.py b/git_by_a_bus/git_by_a_bus.py
+index 887c25a..7bdebb1 100644
+--- a/git_by_a_bus/git_by_a_bus.py
++++ b/git_by_a_bus/git_by_a_bus.py
+@@ -1,3 +1,21 @@
++"""
++Driver for git by a bus.
++
++Calls gen_file_stats.py, estimate_unique_knowledge.py,
++estimate_file_risk.py, summarize.py in a chain, storing output from
++each in output_dir/(basename).tsv.
++
++To re-run only a portion of the calculations, you can remove all tsv
++downstream and run again with the -c option (this is useful if you
++want to manually remove some files from gen_file_stats.tsv, for
++instance, rather than run the gen_file_stats.py step, which is slowest
++by orders of magnitude).
++
++Writes a summary found at output_dir/index.html.
++
++Run as python git_by_a_bus.py -h for options.
++"""
++
+ import sys
+ import os
+ 
+@@ -92,7 +110,9 @@ def main(python_cmd, paths_projects, options):
+ 
+     model_option = "--model %s" % options.model
+ 
+-    # commands to chain together
++    # commands to chain together--the stdout of the first becomes the
++    # stdin of the next.  You can find the output of gen_file_stats.py
++    # in output_dir/gen_file_stats.tsv, and so on.
+     cmd_ts = []
+     cmd_ts.append([None, 'gen_file_stats.py',
+                    ['${interesting_file_option} ${not_interesting_file_option} ${case_sensitive_option} ${git_exe_option} ${svn_option} %s' % path_project \
+@@ -131,7 +151,10 @@ if __name__ == '__main__':
+                
+                Project names are optional and default to the last directory in the path.
+ 
+-               You may alternatively/additionally specify the list of paths/projects in a file with -p."""
++               You may alternatively/additionally specify the list of paths/projects in a file with -p.
++
++               Experimental svn support with --svn and an svn url for project path.
++               """
+     usage = '\n'.join([line.strip() for line in usage.split('\n')])
+ 
+     parser = OptionParser(usage=usage)
+@@ -153,18 +176,19 @@ if __name__ == '__main__':
+                       help='Output directory for data files and html summary (defaults to "output"), error if already exists without -c')
+     parser.add_option('-p', '--projects-file', dest='projects_file', metavar='FILE',
+                       help='File of path[=project_name] lines, where path is an absoluate path to the git-controlled ' + \
+-                      'directory to analyze and project_name is the name to use in the output summary (project_name defaults to ' + \
++                      'directory or svn url to analyze and project_name is the name to use in the output summary (project_name defaults to ' + \
+                       'the last directory name in the path)')
+     parser.add_option('-c', '--continue-last', dest='continue_last', default=False, action="store_true",
+-                      help="Continue last run, using existing output files and recreating missing.")
++                      help="Continue last run, using existing output files and recreating missing.  You can remove tsv files " + \
++                      "in the output dir and modify others to clean up bad runs.")
+     parser.add_option('-v', '--verbose', dest='verbose', default=False, action="store_true", help="Print debugging info")
+     parser.add_option('--python-exe', dest='python_exe', default='/usr/bin/env python',
+                       help='Path to the python interpreter (defaults to "/usr/bin/env python")')
+     parser.add_option('--git-exe', dest='git_exe', help='Path to the git exe (defaults to "/usr/bin/env git")')
+     parser.add_option('--svn', dest='use_svn', default=False, action='store_true',
+-                      help='Use svn intead of git to generate file statistics.  This requires you to install pysvn.')
+-    parser.add_option('--model', dest='model', metavar='MODEL[:MARG1[:MARG2]...]', default='naive:10',
+-                      help='Knowledge model to use, with arguments.')
++                      help='Use svn intead of git to generate file statistics.  This requires you to install pysvn in your PYTHONPATH.')
++    parser.add_option('--model', dest='model', metavar='MODEL[:MARG1[:MARG2]...]', default='sequential:0.1',
++                      help='Knowledge model to use, with arguments.  Right now only sequential is supported.')
+ 
+     options, paths_projects = parser.parse_args()
+ 
+@@ -176,4 +200,3 @@ if __name__ == '__main__':
+         parser.error('No paths/projects!  You must either specify paths/projects on the command line and/or in a file with the -p option.')
+     
+     main(options.python_exe, paths_projects, options)
+- 

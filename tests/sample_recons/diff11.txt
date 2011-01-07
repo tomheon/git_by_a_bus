@@ -1,0 +1,53 @@
+diff --git a/git_by_a_bus/git_by_a_bus.py b/git_by_a_bus/git_by_a_bus.py
+index a066c64..9623bb7 100644
+--- a/git_by_a_bus/git_by_a_bus.py
++++ b/git_by_a_bus/git_by_a_bus.py
+@@ -86,17 +86,20 @@ def main(python_cmd, paths_projects, options):
+     if options.use_svn:
+         svn_option = '--svn'
+ 
+-    git_exe_option = "--git-exe %s" % options.git_exe
++    git_exe_option = ''
++    if options.git_exe:
++        git_exe_option = "--git-exe %s" % options.git_exe
++
++    model_option = "--model %s" % options.model
+ 
+     # commands to chain together
+     cmd_ts = []
+     cmd_ts.append([None, 'gen_file_stats.py',
+                    ['${interesting_file_option} ${not_interesting_file_option} ${case_sensitive_option} ${git_exe_option} ${svn_option} %s' % path_project \
+                     for path_project in paths_projects]])
+-    cmd_ts.append(['gen_file_stats.py', 'calc_file_knowledge_totals.py'])
+-    cmd_ts.append(['calc_file_knowledge_totals.py', 'estimate_unique_knowledge.py', '${departed_dev_option}'])
++    cmd_ts.append(['gen_file_stats.py', 'estimate_unique_knowledge.py', '${departed_dev_option}  ${model_option}'])
+     cmd_ts.append(['estimate_unique_knowledge.py', 'estimate_file_risk.py', '-b ${bus_risk} ${risk_file_option}'])
+-    cmd_ts.append(['estimate_file_risk.py', 'summarize.py', '${output_dir}'])
++    cmd_ts.append(['estimate_file_risk.py', 'summarize.py', '${departed_dev_option} ${output_dir}'])
+                   
+     for cmd_t in cmd_ts:
+         if len(cmd_t) > 2:
+@@ -110,6 +113,9 @@ def main(python_cmd, paths_projects, options):
+                                                 interesting_file_option=interesting_file_option,
+                                                 not_interesting_file_option=not_interesting_file_option,
+                                                 case_sensitive_option=case_sensitive_option,
++                                                git_exe_option=git_exe_option,
++                                                svn_option=svn_option,
++                                                model_option=model_option,
+                                                 output_dir=output_dir) \
+                          for s in opts_args]
+             cmd_t[2] = opts_args
+@@ -154,10 +160,11 @@ if __name__ == '__main__':
+     parser.add_option('-v', '--verbose', dest='verbose', default=False, action="store_true", help="Print debugging info")
+     parser.add_option('--python-exe', dest='python_exe', default='/usr/bin/env python',
+                       help='Path to the python interpreter (defaults to "/usr/bin/env python")')
+-    parser.add_option('--git-exe', dest='git_exe', default='/usr/bin/env git',
+-                      help='Path to the git exe (defaults to "/usr/bin/env git")')
++    parser.add_option('--git-exe', dest='git_exe', help='Path to the git exe (defaults to "/usr/bin/env git")')
+     parser.add_option('--svn', dest='use_svn', default=False, action='store_true',
+                       help='Use svn intead of git to generate file statistics.  This requires you to install pysvn.')
++    parser.add_option('--model', dest='model', metavar='MODEL[:MARG1[:MARG2]...]', default='naive:10',
++                      help='Knowledge model to use, with arguments.')
+ 
+     options, paths_projects = parser.parse_args()
+ 

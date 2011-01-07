@@ -14,7 +14,7 @@ def test_sample_diffs():
                                  13),
                                 (src_file.remove_line,
                                  'author1',
-                                 14)]),
+                                 13)]),
                  ('diff3.txt', [(src_file.change_line,
                                  'author1',
                                  150,

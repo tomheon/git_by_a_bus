@@ -1,0 +1,36 @@
+diff --git a/git_by_a_bus/git_by_a_bus.py b/git_by_a_bus/git_by_a_bus.py
+index c8085c0..8264b1a 100644
+--- a/git_by_a_bus/git_by_a_bus.py
++++ b/git_by_a_bus/git_by_a_bus.py
+@@ -83,7 +83,22 @@ def run_estimate_file_risk(python_cmd, output_dir, unique_knowledge_fname, bus_r
+                            risk_file_option=risk_file_option,
+                            bus_risk=bus_risk).split(' ')
+     cmd_p = Popen(cmd, stdout=output_fil, stdin=input_fil)
+-    print ' '.join(cmd)
++    cmd_p.communicate()
++
++    output_fil.close()
++    input_fil.close()
++
++    return output_fname
++
++def run_summarize(python_cmd, output_dir, estimated_risk_fname):
++    output_fname = os.path.join(output_dir, 'index.html')
++    output_fil = open(output_fname, 'w')
++
++    input_fil = open(estimated_risk_fname, 'r')
++    
++    cmd_t = Template('${python_cmd} summarize.py')
++    cmd = cmd_t.substitute(python_cmd=python_cmd).split(' ')
++    cmd_p = Popen(cmd, stdout=output_fil, stdin=input_fil)
+     cmd_p.communicate()
+ 
+     output_fil.close()
+@@ -104,6 +119,7 @@ def main(paths_projects, options):
+     file_knowlegde_fname = run_calc_file_knowledge_totals(python_cmd, output_dir, file_stats_fname)
+     unique_knowledge_fname = run_estimate_unique_knowledge(python_cmd, output_dir, file_knowlegde_fname, options.departed_dev_file)
+     estimated_risk_fname = run_estimate_file_risk(python_cmd, output_dir, unique_knowledge_fname, options.bus_risk, options.risk_file)
++    run_summarize(python_cmd, output_dir, estimated_risk_fname)
+     
+ if __name__ == '__main__':
+     usage = """usage: %prog [options] [git_controlled_path1[=project_name1], git_controlled_path2[=project_name2],...]

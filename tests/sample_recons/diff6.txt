@@ -1,0 +1,13 @@
+diff --git a/git_by_a_bus/git_by_a_bus.py b/git_by_a_bus/git_by_a_bus.py
+index 1735eae..131f54b 100644
+--- a/git_by_a_bus/git_by_a_bus.py
++++ b/git_by_a_bus/git_by_a_bus.py
+@@ -90,6 +90,8 @@ def main(python_cmd, paths_projects, options):
+     cmd_ts.append(['gen_file_stats.py', 'calc_file_knowledge_totals.py'])
+     cmd_ts.append(['calc_file_knowledge_totals.py', 'estimate_unique_knowledge.py', '${departed_dev_option}'])
+     cmd_ts.append(['estimate_unique_knowledge.py', 'estimate_file_risk.py', '-b ${bus_risk} ${risk_file_option}'])
++    cmd_ts.append(['estimate_file_risk.py', 'cross_compare_present_devs_to_present.py'])
++    cmd_ts.append(['estimate_file_risk.py', 'cross_compare_present_devs_to_departed.py'])        
+     cmd_ts.append(['estimate_file_risk.py', 'summarize.py', '${output_dir}'])
+                   
+     for cmd_t in cmd_ts:

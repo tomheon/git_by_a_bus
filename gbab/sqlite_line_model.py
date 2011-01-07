@@ -60,6 +60,12 @@ class SqliteLineModel(object):
             return None
         return Line(row)
 
+    def file_lines(self, project, fname):
+        proj_id, file_id = self._project_and_file_ids(project, fname)
+        sql = "SELECT lineid, line FROM lines WHERE fileid = ? AND linenum IS NOT NULL ORDER BY linenum;"
+        self.curs.execute(sql, (file_id,))
+        return self.curs.fetchall()
+
     # implementation
 
     def _project_and_file_ids(self, project, fname):
@@ -92,7 +98,6 @@ class SqliteLineModel(object):
                 "CREATE INDEX IF NOT EXISTS projectid_idx ON files (projectid);",                                
                 "CREATE TABLE IF NOT EXISTS lines (lineid INTEGER PRIMARY KEY ASC, fileid INTEGER, linenum INTEGER, line TEXT);",
                 "CREATE INDEX IF NOT EXISTS fileid_idx ON lines (fileid);",
-                "CREATE UNIQUE INDEX IF NOT EXISTS fileid_linenum_idx ON lines (fileid, linenum);",
                 "CREATE VIEW IF NOT EXISTS linesview AS SELECT lines.lineid, lines.linenum, lines.line, " + \
                 "files.fileid, files.filename, projects.projectid, projects.projectname FROM files, projects, lines " + \
                 "WHERE files.projectid = projects.projectid AND lines.fileid = files.fileid;"]

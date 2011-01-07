@@ -35,7 +35,6 @@ class DiffWalker(object):
         cur_chunk = []
         
         for line in diff.split('\n'):
-            line = line.rstrip('\r')
             if self._starts_chunk(line):
                 if cur_chunk:
                     chunks.append(cur_chunk)
@@ -74,7 +73,6 @@ class DiffWalker(object):
         # hunks: [(start_line_num, [old, lines, ...], [new, lines, ...])]
         #
         hunks = self._hunkize(chunk[1:], new_offset)
-
         for hunk in hunks:
             self._step_hunk(author, hunk, source_file)
 
@@ -83,15 +81,15 @@ class DiffWalker(object):
         old_len = len(old_lines)
         new_len = len(new_lines)
         max_len = max(old_len, new_len)
-            
+        line_num = start_line_num
+        
         for i in range(max_len):
-            line_num = start_line_num + i
-                
             if i < old_len and i < new_len:
                 # if file exists in both arrays, it's changed,
                 # just remember to strip out the '+' at the
                 # beginning of the line
                 source_file.change_line(author, line_num, new_lines[i][1:])
+                line_num += 1
             elif i < old_len:
                 # there is no corresponding line in the new file,
                 # then this has been deleted
@@ -100,26 +98,30 @@ class DiffWalker(object):
                 # this must be an added line, strip out the '+' at the
                 # beginning
                 source_file.add_line(author, line_num, new_lines[i][1:])
+                line_num += 1
 
     def _hunkize(self, chunk_wo_header, first_line_num):
         hunks = []
         cur_old = []
         cur_new = []
-
-        for i, line in enumerate(chunk_wo_header):
+        cur_line = first_line_num
+        
+        for line in chunk_wo_header:
             if self._is_old_line(line):
                 cur_old.append(line)
             elif self._is_new_line(line):
                 cur_new.append(line)
             elif cur_old or cur_new:
-                start_of_hunk_line = first_line_num + i - len(cur_old) - len(cur_new)
-                hunks.append((start_of_hunk_line, cur_old, cur_new))
+                hunks.append((cur_line, cur_old, cur_new))
+                cur_line += len(cur_new) + 1
                 cur_old = []
                 cur_new = []
+            else:
+                cur_line += 1
 
         # catch the last hunk, if there is one
         if cur_old or cur_new:
-            hunks.append((first_line_num + len(chunk_wo_header) - 1, cur_old, cur_new))
+            hunks.append((cur_line, cur_old, cur_new))
 
         return hunks
 

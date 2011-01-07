@@ -1,0 +1,22 @@
+diff --git a/git_by_a_bus/git_by_a_bus.py b/git_by_a_bus/git_by_a_bus.py
+index 1735eae..31a4579 100644
+--- a/git_by_a_bus/git_by_a_bus.py
++++ b/git_by_a_bus/git_by_a_bus.py
+@@ -80,7 +80,7 @@ def main(python_cmd, paths_projects, options):
+     not_interesting_file_option = ' '.join(["-n %s" % n for n in options.not_interesting])
+     case_sensitive_option = ''
+     if options.case_sensitive:
+-        case_sensitive_option = '-s'
++        case_sensitive_option = '--case-sensitive'
+ 
+     # commands to chain together
+     cmd_ts = []
+@@ -135,7 +135,7 @@ if __name__ == '__main__':
+                       'Defaults are \.java$ \.cs$ \.python$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.rb$', default=[])
+     parser.add_option('-n', '--not-interesting', metavar="REGEXP", dest="not_interesting", action='append', default=[],
+                       help="Regular expression to override interesting files.  May be repeated, any match is enough to squelch interest.")
+-    parser.add_option('-s', '--case-sensitive', dest='case_sensitive', action='store_true', default=False,
++    parser.add_option('--case-sensitive', dest='case_sensitive', action='store_true', default=False,
+                       help='Use case-sensitive regepxs when finding interesting / uninteresting files (defaults to case-insensitive)')
+     parser.add_option('-o', '--output', dest='output', metavar='DIRNAME', default='output',
+                       help='Output directory for data files and html summary (defaults to "output"), error if already exists without -c')
