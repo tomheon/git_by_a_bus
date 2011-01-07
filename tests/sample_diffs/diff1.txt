@@ -1,0 +1,12 @@
+diff --git a/estimate_file_risk.py b/estimate_file_risk.py
+index d6b484d..3ecc8b5 100644
+--- a/estimate_file_risk.py
++++ b/estimate_file_risk.py
+@@ -48,6 +48,7 @@ def parse_risk_file(risk_file, bus_risks):
+         if not line:
+             continue
+         dev, risk = line.split('=')
++        dev = dev.replace(',', '_').replace(':', '_')
+         bus_risks[dev] = float(risk)
+     risk_f.close()
+ 

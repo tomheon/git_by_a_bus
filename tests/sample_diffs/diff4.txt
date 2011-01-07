@@ -1,0 +1,22 @@
+diff --git a/git_file_stats.py b/git_file_stats.py
+index 18d6933..b40bfe0 100644
+--- a/git_file_stats.py
++++ b/git_file_stats.py
+@@ -14,7 +14,7 @@ import re
+ 
+ from subprocess import Popen, PIPE
+ 
+-from common import is_interesting, FileData
++from common import is_interesting, FileData, safe_author_name
+     
+ def gen_stats(root, project, interesting, not_interesting, options):
+     """
+@@ -84,7 +84,7 @@ def parse_experience(log):
+                 print >> sys.stderr, "Weird entry, cannot parse: %s\n-----" % '\n'.join(local_entry)
+                 continue
+             author, changes = local_entry[:2]
+-            author = author.replace(',', '_').replace(':', '_')
++            author = safe_author_name(author)
+             try:
+                 changes_split = re.split(r'\s+', changes)
+                 # this can be two fields if there were file renames

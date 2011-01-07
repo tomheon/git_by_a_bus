@@ -1,0 +1,22 @@
+diff --git a/common.py b/common.py
+index 5f42601..c26e897 100644
+--- a/common.py
++++ b/common.py
+@@ -2,6 +2,8 @@
+ Common and other crappy code used throughout git by a bus.
+ """
+ 
++def safe_author_name(author):
++        return author.replace(',', '_').replace(':', '_')
+def safe_int(i):
+     if i is None or i == '':
+         return None
+@@ -113,7 +119,7 @@ def parse_departed_devs(dd_file, departed_devs):
+     fil = open(dd_file, 'r')
+     for line in fil:
+         line = line.strip()
+-        line = line.replace(',', '_').replace(':', '_')
++        line = safe_author_name(line)
+         if not line:
+             continue
+         departed_devs.append(line)
