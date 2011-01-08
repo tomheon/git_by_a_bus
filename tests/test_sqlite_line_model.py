@@ -13,7 +13,10 @@ class TestSqliteLineModel(object):
     def teardown(self):
         self.conn.close()
 
-    def testLookupCreateRemove(self):
+    def test_lookup_none_linenum(self):
+        eq_(None, self.model.lookup_line_id('hi', 'there', None))
+
+    def test_lookup_create_remove(self):
         eq_(None, self.model.lookup_line_id('no such proj', 'no such file', 100))
         self.model.add_line('proj', 'fil', 12, 'hi there')
         eq_(None, self.model.lookup_line_id('no such proj', 'no such file', 100))                
@@ -22,7 +25,7 @@ class TestSqliteLineModel(object):
         self.model.remove_line(line_id)
         eq_(None, self.model.lookup_line_id('no such proj', 'no such file', 100))
 
-    def testGetChange(self):
+    def test_get_change(self):
         eq_(None, self.model.get_line(0))
         self.model.add_line('proj', 'fil', 12, 'hi there')
         line_id = self.model.lookup_line_id('proj', 'fil', 12)
@@ -40,6 +43,3 @@ class TestSqliteLineModel(object):
         eq_(12, line.line_num)
         eq_(line_id, line.line_id)
         eq_('bye here', line.line)
-        
-        
-

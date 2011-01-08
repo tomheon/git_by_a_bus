@@ -128,8 +128,6 @@ class SqliteKnowledgeModel(object):
         select = "SELECT authorid FROM authors WHERE author = ?;"
         self.cursor.execute(select, (author,))
         row = self.cursor.fetchone()
-        if not row:
-            return None
         return row[0]
 
     def _create_tables(self):

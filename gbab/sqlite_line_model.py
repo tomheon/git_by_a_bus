@@ -21,6 +21,7 @@ class SqliteLineModel(object):
         self._create_tables()
 
     def lookup_line_id(self, project, fname, line_num):
+        # don't want anyone looking up a dead line by accident...
         if line_num is None:
             return None
         sql = "SELECT lineid FROM linesview WHERE projectname = ? AND filename = ? AND linenum = ?;"

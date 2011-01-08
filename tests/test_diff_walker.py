@@ -41,7 +41,13 @@ def test_sample_diffs():
                                 (src_file.change_line,
                                  'author1',
                                  122,
-                                 "        line = safe_author_name(line)")])]
+                                 "        line = safe_author_name(line)")]),
+                 ('diff6.txt', [(src_file.remove_line,
+                                 'author1',
+                                 13),
+                                (src_file.remove_line,
+                                 'author1',
+                                 13)])]
                  
     for sample_diff_fname, expected_call_log in test_data:
         diff_walker = DiffWalker()

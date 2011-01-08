@@ -20,6 +20,7 @@ class TestSqliteRiskModel(object):
         eq_(0.2, self.model.get_bus_risk('author1'))
         eq_(0.3, self.model.get_bus_risk('author2'))        
         eq_(0.1, self.model.get_bus_risk('somebodyelse'))
+        eq_(0.4, self.model.get_bus_risk('why=god'))        
 
     def test_departed(self):
         ok_(self.model.is_departed('departedauth1'))

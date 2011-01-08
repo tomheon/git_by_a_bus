@@ -63,6 +63,15 @@ class TestSqliteKnowledgeModel(object):
         self._fok(1.0 * (1.0 - 0.1), self.model._knowledge_in_acct(SqliteKnowledgeModel.SAFE_KNOWLEDGE_ACCT_ID, line_id))
 
         self.risk_model.is_safe = False
+
+    def test_get_knowledge_acct(self):
+        eq_(None, self.model.get_knowledge_acct(0))
+        auth1 = 'author1'
+        auth1_knowledge_acct_id = self.model._lookup_or_create_knowledge_acct([auth1])
+        acct = self.model.get_knowledge_acct(auth1_knowledge_acct_id)
+        ok_(acct)
+        eq_([auth1], acct.authors)
+        eq_('author1', acct.authors_str)        
         
     def _fok(self, fval1, fval2):
         ok_(fval1 + 0.001 > fval2 and fval1 - 0.001 < fval2)
