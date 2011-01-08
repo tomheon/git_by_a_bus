@@ -49,3 +49,12 @@ class MockSourceFile(Mock):
 
     def add_line(self, author, line_num, line):
         self._rcrd((self.add_line, author, line_num, line))
+
+
+class MockRiskModel(Mock):
+
+    def __init__(self):
+        self.is_safe = False
+
+    def joint_bus_prob_is_safe(self, authors):
+        return self.is_safe
