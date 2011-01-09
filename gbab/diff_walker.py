@@ -1,24 +1,35 @@
 class DiffWalker(object):
     """
-    Walk the chunks and hunks of a diff, processing them in the
-    associated SourceFile object as added, removed, and changed lines.
+    Walk the chunks and hunks of a diff, returning them as a list of
+    events.
     """
 
-    def walk(self, author, diff, source_file):
+    def walk(self, diff, legend=None, progress=None):
         """
         Diff should be in the default git diff or git diff --patience
         output for a single file.
 
-        source_file should be a SourceFile object (or support the
-        equivalent operations)
 
-        Walks the diff to find added, changed, and deleted lines and
-        calling into source_file to process them.
+        Walks the diff to find added, changed, and deleted lines,
+        returning a list of tuples of the form:
+        
+        [('added'|'changed'|'deleted', int(line_num), str(line_val)|None)]
         """
         chunks = self._chunkify(diff)
 
-        for chunk in chunks:
-            self._step_chunk(chunk, author, source_file)
+        if legend is None:
+            legend = ''
+
+        tot_chunks = len(chunks)
+
+        events = []
+
+        for i, chunk in enumerate(chunks):
+            if progress:
+                print >> progress, "%sWalking chunk %d/%d" % (legend, i + 1, tot_chunks)
+            self._step_chunk(chunk, events, legend + "\t", progress)
+
+        return events
 
     # implementation
 
@@ -52,31 +63,36 @@ class DiffWalker(object):
     def _starts_chunk(self, line):
         return line and line.startswith('@@')
 
-    def _step_chunk(self, chunk, author, source_file):
+    def _step_chunk(self, chunk, events, legend, progress):
         header = chunk[0]
         
         # format of header is
         #
         # @@ -old_line_num,cnt_lines_in_old_chunk, +new_line_num,cnt_lines_in_new_chunk
         #
-        _blank, lines_info, _rest = header.split('@@')
+        _blank, lines_info, _rest = header.split('@@', 2)
         offsets = lines_info.strip().split(' ')
         
         # we only care about the new offset, since in the first chunk
         # of the file the new and old are the same, and since we add
         # and subtract lines as we go, we should stay in step with the
         # new offsets.
-        new_offset, new_cnt_lines = [abs(int(num)) for num in offsets[1].split(',')]
+        
+        new_offset = [abs(int(num)) for num in offsets[1].split(',')][0]
 
         # a hunk is  a group of contingent - + lines
         #
         # hunks: [(start_line_num, [old, lines, ...], [new, lines, ...])]
         #
         hunks = self._hunkize(chunk[1:], new_offset)
-        for hunk in hunks:
-            self._step_hunk(author, hunk, source_file)
 
-    def _step_hunk(self, author, hunk, source_file):
+        tot_hunks = len(hunks)
+        for i, hunk in enumerate(hunks):
+            if progress:
+                print >> progress, "%sWalking hunk %d/%d" % (legend, i + 1, tot_hunks)
+            self._step_hunk(hunk, events)
+
+    def _step_hunk(self, hunk, events):
         start_line_num, old_lines, new_lines = hunk
         old_len = len(old_lines)
         new_len = len(new_lines)
@@ -88,16 +104,16 @@ class DiffWalker(object):
                 # if file exists in both arrays, it's changed,
                 # just remember to strip out the '+' at the
                 # beginning of the line
-                source_file.change_line(author, line_num, new_lines[i][1:])
+                events.append(('changed', line_num, new_lines[i][1:]))
                 line_num += 1
             elif i < old_len:
                 # there is no corresponding line in the new file,
                 # then this has been deleted
-                source_file.remove_line(author, line_num)
+                events.append(('deleted', line_num, None))
             else:
                 # this must be an added line, strip out the '+' at the
                 # beginning
-                source_file.add_line(author, line_num, new_lines[i][1:])
+                events.append(('added', line_num, new_lines[i][1:]))
                 line_num += 1
 
     def _hunkize(self, chunk_wo_header, first_line_num):

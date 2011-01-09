@@ -23,7 +23,9 @@ class SqliteKnowledgeModel(object):
         knowledge_created = self.change_knowledge_constant
         knowledge_acquired = 1.0 - self.change_knowledge_constant
         tot_line_knowledge = float(self._tot_line_knowledge(line_id))
-        knowledge_acquired_pct = knowledge_acquired / tot_line_knowledge
+        knowledge_acquired_pct = 0.0
+        if tot_line_knowledge:
+            knowledge_acquired_pct = knowledge_acquired / tot_line_knowledge
         self._redistribute_knowledge(author, author_id, line_id, knowledge_acquired_pct)
         knowledge_acct_id = self._lookup_or_create_knowledge_acct([author])
         self._adjust_knowledge(knowledge_acct_id, line_id, knowledge_created)
@@ -66,7 +68,7 @@ class SqliteKnowledgeModel(object):
                 new_authors = list(knowledge_acct.authors)
                 new_authors.append(author)
                 new_authors.sort()
-                if self.risk_model.joint_bus_prob_is_safe(new_authors):
+                if self.risk_model.joint_bus_prob_below_threshold(new_authors):
                     new_knowledge_acct_id = self.SAFE_KNOWLEDGE_ACCT_ID
                 else:
                     new_knowledge_acct_id = self._lookup_or_create_knowledge_acct(new_authors)
@@ -104,7 +106,7 @@ class SqliteKnowledgeModel(object):
         authors.sort()
         authors_str = '\n'.join(authors)
         sql = "SELECT knowledgeacctid FROM knowledgeaccts WHERE authors = ?;"
-        self.cursor.execute(sql, (authors_str,))
+        self.cursor.execute(sql, (unicode(authors_str),))
         row = self.cursor.fetchone()
         if not row:
             insert = "INSERT INTO knowledgeaccts (authors) VALUES (?);"
@@ -124,7 +126,7 @@ class SqliteKnowledgeModel(object):
 
     def _lookup_or_create_author(self, author):
         insert = "INSERT OR IGNORE INTO authors (author) VALUES (?);"
-        self.cursor.execute(insert, (author,))
+        self.cursor.execute(insert, (unicode(author),))
         select = "SELECT authorid FROM authors WHERE author = ?;"
         self.cursor.execute(select, (author,))
         row = self.cursor.fetchone()

@@ -34,7 +34,7 @@ class SqliteLineModel(object):
         insert_sql = "INSERT INTO lines (fileid, linenum, line) VALUES (?, ?, ?);"
         
         self.curs.execute(bump_existing_lines_sql, (file_id, line_num))
-        self.curs.execute(insert_sql, (file_id, line_num, line))
+        self.curs.execute(insert_sql, (file_id, line_num, unicode(line)))
         self.conn.commit()
 
     def remove_line(self, line_id):
