@@ -355,7 +355,7 @@ def create_dev_pages(aggs, output_dir, departed_devs):
             if the_dev in departed_devs:
                 return html
             agg = aggs[(a_valtype, a_dev)]
-            shared_k_agg = agg['shared knowledge (devs still present)']
+            shared_k_agg = agg.get('shared knowledge (devs still present)',[])
             top_shares = {}
             for dev_devs, shared in shared_k_agg.items():
                 the_dev_devs = dev_devs.split(' and ')
