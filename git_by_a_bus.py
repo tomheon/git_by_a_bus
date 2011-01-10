@@ -24,6 +24,9 @@ from optparse import OptionParser
 from subprocess import Popen
 from string import Template
 
+SCRIPT_PATH=os.path.dirname(os.path.realpath(__file__))
+sys.path.append(SCRIPT_PATH)
+
 def exit_with_error(err):
     print >> sys.stderr, "Error: " + err
     exit(1)
@@ -115,12 +118,15 @@ def main(python_cmd, paths_projects, options):
     # stdin of the next.  You can find the output of gen_file_stats.py
     # in output_dir/gen_file_stats.tsv, and so on.
     cmd_ts = []
-    cmd_ts.append([None, 'gen_file_stats.py',
+    cmd_ts.append([None, os.path.join(SCRIPT_PATH,'gen_file_stats.py'),
                    ['${interesting_file_option} ${not_interesting_file_option} ${case_sensitive_option} ${git_exe_option} ${svn_option} %s' % path_project \
                     for path_project in paths_projects]])
-    cmd_ts.append(['gen_file_stats.py', 'estimate_unique_knowledge.py', '${model_option}'])
-    cmd_ts.append(['estimate_unique_knowledge.py', 'estimate_file_risk.py', '-b ${bus_risk} ${risk_file_option}'])
-    cmd_ts.append(['estimate_file_risk.py', 'summarize.py', '${departed_dev_option} ${output_dir}'])
+    cmd_ts.append([os.path.join(SCRIPT_PATH,'gen_file_stats.py'),
+        os.path.join(SCRIPT_PATH,'estimate_unique_knowledge.py'), '${model_option}'])
+    cmd_ts.append([os.path.join(SCRIPT_PATH,'estimate_unique_knowledge.py'),
+        os.path.join(SCRIPT_PATH,'estimate_file_risk.py'), '-b ${bus_risk} ${risk_file_option}'])
+    cmd_ts.append([os.path.join(SCRIPT_PATH,'estimate_file_risk.py'),
+        os.path.join(SCRIPT_PATH,'summarize.py'), '${departed_dev_option} ${output_dir}'])
                   
     for cmd_t in cmd_ts:
         if len(cmd_t) > 2:
