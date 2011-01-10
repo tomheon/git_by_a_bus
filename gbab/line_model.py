@@ -1,4 +1,4 @@
-class SqliteLineModel(object):
+class LineModel(object):
     """
     Model for lines in a single file.
     """

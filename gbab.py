@@ -9,9 +9,10 @@ from optparse import OptionParser
 
 from gbab.git_repo import GitRepo
 from gbab.diff_walker import DiffWalker
-from gbab.sqlite_knowledge_model import SqliteKnowledgeModel
+from gbab.knowledge_model import KnowledgeModel
 from gbab.risk_model import RiskModel
-from gbab.sqlite_line_model import SqliteLineModel
+from gbab.line_model import LineModel
+from gbab.summary_model import SummaryModel
 
 # used in workaround for multiprocessing bug
 REALLY_LONG_TIME = 86400 * 10
@@ -24,6 +25,7 @@ def parse_history(args):
     project, project_root, fname, queue, verbose = args
     repo = GitRepo(project_root, '/usr/bin/env git')
     entries = repo.log(fname)
+    repo_root = repo.git_root()
     results = []
     diff_walker = DiffWalker()
 
@@ -31,22 +33,52 @@ def parse_history(args):
         print >> sys.stderr, "Parsing history for %s" % fname
 
     try:
-        queue.put((project, project_root, fname, [(author, diff_walker.walk(diff)) for (author, diff) in entries]))
+        queue.put((project, repo_root, project_root, fname, [(author, diff_walker.walk(diff)) for (author, diff) in entries]))
     except:
         print >> sys.stderr, "error", fname
     return True
 
 def summarize(output_dir, queue):
+    db_fname = os.path.join(output_dir, 'summary.db')
+    conn = sqlite3.connect(db_fname)
+    summary_model = SummaryModel(conn)
+    
     while True:
-        x = queue.get()
-        if x is None:
+        condensed_analysis = queue.get()
+        if condensed_analysis is None:
             break
-    return "summary.db"
+        summary_model.summarize(condensed_analysis)
+    return db_fname
 
-def _condense_analysis(project, project_root, line_model, knowledge_model, risk_model):
-    return ''
-                       
+def _condense_analysis(project, repo_root, project_root, fname, line_model, knowledge_model, risk_model):
+    """
+    Return a tuple of the form:
+    (project, repo_root, project_root, fname, [(line, [([author], knowledge, risk)])])
+    """
 
+    line_condensations = []
+    for i, line in enumerate(line_model.get_lines()):
+        line_num = i + 1
+        author_knowledges = knowledge_model.knowledge_summary(line_num)
+        tmp = []
+        for authors, knowledge in author_knowledges:
+            orphaned = 0.0
+            if all(risk_model.is_departed(author) for author in authors):
+                orphaned = knowledge
+                knowledge = 0.0
+            tmp.append((authors, knowledge, orphaned))
+        author_knowledges = tmp
+        author_knowledges.sort()
+        author_knowledges = [(authors,
+                              knowledge,
+                              risk_model.joint_bus_prob(authors) * knowledge,
+                              orphaned) for (authors,
+                                             knowledge,
+                                             orphaned) in author_knowledges]
+        line_condensations.append((line, author_knowledges))
+
+    return (project, repo_root, project_root, fname, line_condensations)
+        
 def analyze(a_id, inqueue, outqueue,
             departed_fname,
             risk_threshold, default_bus_risk, bus_risk_fname,
@@ -69,10 +101,10 @@ def analyze(a_id, inqueue, outqueue,
         # time and then throw them away after extracting the final
         # pertinent information.
         conn = sqlite3.connect(':memory:')
-        line_model =  SqliteLineModel(conn)
-        knowledge_model = SqliteKnowledgeModel(conn, created_knowledge_constant, risk_model)
+        line_model =  LineModel(conn)
+        knowledge_model = KnowledgeModel(conn, created_knowledge_constant, risk_model)
 
-        project, project_root, fname, entries = args
+        project, repo_root, project_root, fname, entries = args
         
         for entry in entries:
             author, changes = entry
@@ -84,16 +116,10 @@ def analyze(a_id, inqueue, outqueue,
                 changetype, line_num, line = change
                 line_model.apply_change(changetype, line_num, line)
                 knowledge_model.apply_change(changetype, author, line_num)
-                if changetype == 'change':
-                    knowledge_model.line_changed(author, line_num)
-                elif changetype == 'add':
-                    knowledge_model.line_added(author, line_num)
-                elif changetype == 'remove':
-                    knowledge_model.line_removed(author, line_num)
 
         # pick up any remaining changes in the models
         conn.commit()
-        outqueue.put(_condense_analysis(project, project_root, line_model, knowledge_model, risk_model))
+        outqueue.put(_condense_analysis(project, repo_root, project_root, fname, line_model, knowledge_model, risk_model))
         conn.close()
         
     return changes_processed
@@ -133,6 +159,7 @@ def main(options, args):
     options.num_git_procs = int(options.num_git_procs)    
 
     project_root = args[0]
+    project_root = os.path.realpath(project_root)
     
     # calculate the files to analyze
     interesting, not_interesting = _parse_interest_regexps(options)
@@ -140,6 +167,10 @@ def main(options, args):
     repo = GitRepo(project_root, options.git_exe)
     
     fnames = _interesting_fnames(repo, interesting, not_interesting)
+
+    if not fnames:
+        print >> sys.stderr, "No interesting files found, exiting."
+        exit(1)
 
     mgr = Manager()
     analyzer_queue = mgr.Queue()

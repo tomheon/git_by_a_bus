@@ -9,6 +9,8 @@ class RiskModel(object):
         self._parse_departed(departed_fname)
 
     def get_bus_risk(self, author):
+        if author is None:
+            return risk_threshold
         if author not in self.bus_risks:
             self.bus_risks[author] = self.default_bus_risk
         return self.bus_risks[author]
@@ -16,9 +18,12 @@ class RiskModel(object):
     def is_departed(self, author):
         return author in self.departed
 
-    def joint_bus_prob_below_threshold(self, authors):
+    def joint_bus_prob(self, authors):
         return reduce(lambda x, y: x * y,
-                      [self.get_bus_risk(author) for author in authors]) <= self.risk_threshold
+                      [self.get_bus_risk(author) for author in authors])
+        
+    def joint_bus_prob_below_threshold(self, authors):
+        return self.joint_bus_prob(authors) <= self.risk_threshold
 
     # implementation
 
@@ -43,6 +48,6 @@ class RiskModel(object):
                     if not line:
                         continue
                     author = line
-                    # there's no bus risk for a departed dude
-                    self.bus_risks[author] = 0.0
+                    # there's one bus risk for a departed dude
+                    self.bus_risks[author] = 1.0
                     self.departed.add(author)

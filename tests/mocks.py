@@ -17,3 +17,6 @@ class MockRiskModel(Mock):
 
     def joint_bus_prob_below_threshold(self, authors):
         return self.is_safe
+
+    def is_departed(self, author):
+        return False

@@ -2,13 +2,13 @@ import sqlite3
 
 from nose.tools import ok_, eq_
 
-from gbab.sqlite_line_model import SqliteLineModel
+from gbab.line_model import LineModel
 
-class TestSqliteLineModel(object):
+class TestLineModel(object):
 
     def setup(self):
         self.conn = sqlite3.connect(':memory:')
-        self.model = SqliteLineModel(self.conn)
+        self.model = LineModel(self.conn)
 
     def teardown(self):
         self.conn.close()

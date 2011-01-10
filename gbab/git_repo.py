@@ -22,21 +22,41 @@ class GitRepo(object):
         git_cmd = ('%s ls-tree --full-tree --name-only -r HEAD' % self.git_exe).split(' ')
         git_cmd.append(self.project_root)
         git_p = Popen(git_cmd, stdout=PIPE)
-        fnames = git_p.communicate()[0].split('\n')
+        (out, err) = git_p.communicate()
+        if err:
+            print >> sys.stderr, "Error from git ls: %s" % err
+            raise IOError(err)
+        fnames = out.split('\n')
         os.chdir(cwd)
         return fnames
 
-    def log(self, fname, progress=None, legend=None):
+    def log(self, fname):
         """
         Return parsed logs in the form:
 
         [(author, diff]
         """
-        return self._parse_log(fname, progress, legend or "")
+        return self._parse_log(fname)
+
+    def git_root(self, chdir=True):
+        """
+        Given that we have chdir'd into a Git controlled dir, get the git
+        root for purposes of adjusting paths.
+        """
+        cwd = os.getcwd()
+        if chdir:
+            os.chdir(self.project_root)
+        git_cmd = ('%s rev-parse --show-toplevel' % self.git_exe).split(' ')
+        git_p = Popen(git_cmd, stdout=PIPE)
+        root = git_p.communicate()[0].strip()
+        if chdir:
+            os.chdir(cwd)
+        return root
+
 
     # implementation
 
-    def _parse_log(self, fname, progress, legend):
+    def _parse_log(self, fname):
         parsed_entries = []
         # -z = null byte separate log entries
         # -w = ignore all whitespace when calculating changed lines
@@ -49,6 +69,9 @@ class GitRepo(object):
         git_cmd.append(fname)
         git_p = Popen(git_cmd, stdout=PIPE)
         (out, err) = git_p.communicate()
+        if err:
+            print >> sys.stderr, "Error from git ls: %s" % err
+            raise IOError(err)
         out = unicode(out, 'utf8', errors='ignore')
 
         log_entries = [entry for entry in out.split('\0') if entry.strip()]
@@ -56,8 +79,6 @@ class GitRepo(object):
         tot_entries = len(log_entries)
         
         for i, entry in enumerate(log_entries):
-            if progress:
-                print >> progress, "%sWalking log entry %d/%d" % (legend, i + 1, tot_entries)
             try:
                 header, diff = self._split_entry_header(entry)
                 diff = '\n'.join(diff)
@@ -71,6 +92,8 @@ class GitRepo(object):
                 pass
                 #print >> sys.stderr, "Could not parse git log entry %s" % entry
                 #print >> sys.stderr, e
+
+        parsed_entries.reverse()
 
         return parsed_entries
 
@@ -94,17 +117,8 @@ class GitRepo(object):
 
         return lines[:ind], lines[ind:]
 
-    def _git_root(self):
-        """
-        Given that we have chdir'd into a Git controlled dir, get the git
-        root for purposes of adjusting paths.
-        """
-        git_cmd = ('%s rev-parse --show-toplevel' % self.git_exe).split(' ')
-        git_p = Popen(git_cmd, stdout=PIPE)
-        return git_p.communicate()[0].strip()
-
     def _chdir(self):
         # first we have to get into the git repo to make the git_root work...
         os.chdir(self.project_root)
         # then we can change to the git root
-        os.chdir(self._git_root())
+        os.chdir(self.git_root(False))

@@ -3,11 +3,11 @@ import sqlite3
 from nose.tools import eq_
 
 from gbab.diff_walker import DiffWalker
-from gbab.sqlite_line_model import SqliteLineModel
+from gbab.line_model import LineModel
 
 def test_reconstruction():
     conn = sqlite3.connect(':memory:')
-    line_model = SqliteLineModel(conn)
+    line_model = LineModel(conn)
     diff_walker = DiffWalker()
     
     for ind in range(13):
