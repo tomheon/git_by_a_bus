@@ -43,7 +43,7 @@ def read_projects_file(fname, paths_projects):
 def output_fname_for(pyfile, output_dir):
     if not pyfile:
         return None
-    return os.path.join(output_dir, os.path.splitext(pyfile)[0] + '.tsv')
+    return os.path.join(output_dir, os.path.splitext(os.path.basename(pyfile))[0] + '.tsv')
 
 def run_chained(cmd_ts, python_cmd, output_dir, verbose):
     for cmd_t in cmd_ts:
