@@ -43,47 +43,60 @@ def summarize(output_dir, queue):
             break
     return "summary.db"
 
-def analyze(a_id, inqueue, outqueue, departed_fname,
+def _condense_analysis(project, project_root, line_model, knowledge_model, risk_model):
+    return ''
+                       
+
+def analyze(a_id, inqueue, outqueue,
+            departed_fname,
             risk_threshold, default_bus_risk, bus_risk_fname,
             created_knowledge_constant,
             verbose):
-    i = 0
+    # since the risk model is only populated from files and is read
+    # only, we can create it once per process
+    risk_model = RiskModel(risk_threshold, default_bus_risk, departed_fname, bus_risk_fname)
+    
+    changes_processed = 0
     
     while True:
-        x = inqueue.get()
-        if x is None:
+        args = inqueue.get()
+        # None is the signal that we're finished analyzing and can
+        # quit
+        if args is None:
             break
+
+        # we re-create the line model and the knowledge model each
+        # time and then throw them away after extracting the final
+        # pertinent information.
         conn = sqlite3.connect(':memory:')
         line_model =  SqliteLineModel(conn)
-        risk_model = RiskModel(risk_threshold, default_bus_risk, departed_fname, bus_risk_fname)
         knowledge_model = SqliteKnowledgeModel(conn, created_knowledge_constant, risk_model)
 
-        project, project_root, fname, entries = x
+        project, project_root, fname, entries = args
+        
         for entry in entries:
             author, changes = entry
             for change in changes:
-                i += 1
-                if i % 1000 == 0 and verbose:
-                    print >> sys.stderr, "Analyzer proc #%d applied change #%d" % (a_id, i)
+                changes_processed += 1
+                if changes_processed % 1000 == 0 and verbose:
+                    print >> sys.stderr, "Analyzer proc #%d applied change #%d" % (a_id, changes_processed)
+
                 changetype, line_num, line = change
-                if changetype == 'changed':
-                    line_id = line_model.lookup_line_id(project, fname, line_num)
-                    line_model.change_line(line_id, line)        
-                    knowledge_model.line_changed(author, line_id)
-                elif changetype == 'added':
-                    line_id = line_model.add_line(project, fname, line_num, line)
-                    knowledge_model.line_added(author, line_id)
-                elif changetype == 'deleted':
-                    line_id = line_model.lookup_line_id(project, fname, line_num)
-                    line_model.remove_line(line_id)
-                    knowledge_model.line_removed(author, line_id)
+                line_model.apply_change(changetype, line_num, line)
+                knowledge_model.apply_change(changetype, author, line_num)
+                if changetype == 'change':
+                    knowledge_model.line_changed(author, line_num)
+                elif changetype == 'add':
+                    knowledge_model.line_added(author, line_num)
+                elif changetype == 'remove':
+                    knowledge_model.line_removed(author, line_num)
 
-        outqueue.put("tbd summary")
-
+        # pick up any remaining changes in the models
         conn.commit()
+        outqueue.put(_condense_analysis(project, project_root, line_model, knowledge_model, risk_model))
         conn.close()
         
-    return i
+    return changes_processed
 
 def _parse_interest_regexps(options):
     interesting = options.interesting
@@ -127,7 +140,7 @@ def main(options, args):
     repo = GitRepo(project_root, options.git_exe)
     
     fnames = _interesting_fnames(repo, interesting, not_interesting)
-    
+
     mgr = Manager()
     analyzer_queue = mgr.Queue()
     summarizer_queue = mgr.Queue()
@@ -169,7 +182,6 @@ def main(options, args):
     _render_summary(summary_db, options.output_dir)
     
     print >> sys.stderr, "Done, summary is in %s/index.html" % options.output_dir
-
 
 if __name__ == '__main__':
     parser = OptionParser()

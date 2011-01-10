@@ -4,7 +4,7 @@ class DiffWalker(object):
     events.
     """
 
-    def walk(self, diff, legend=None, progress=None):
+    def walk(self, diff):
         """
         Diff should be in the default git diff or git diff --patience
         output for a single file.
@@ -17,17 +17,12 @@ class DiffWalker(object):
         """
         chunks = self._chunkify(diff)
 
-        if legend is None:
-            legend = ''
-
         tot_chunks = len(chunks)
 
         events = []
 
         for i, chunk in enumerate(chunks):
-            if progress:
-                print >> progress, "%sWalking chunk %d/%d" % (legend, i + 1, tot_chunks)
-            self._step_chunk(chunk, events, legend + "\t", progress)
+            self._step_chunk(chunk, events)
 
         return events
 
@@ -63,7 +58,7 @@ class DiffWalker(object):
     def _starts_chunk(self, line):
         return line and line.startswith('@@')
 
-    def _step_chunk(self, chunk, events, legend, progress):
+    def _step_chunk(self, chunk, events):
         header = chunk[0]
         
         # format of header is
@@ -88,8 +83,6 @@ class DiffWalker(object):
 
         tot_hunks = len(hunks)
         for i, hunk in enumerate(hunks):
-            if progress:
-                print >> progress, "%sWalking hunk %d/%d" % (legend, i + 1, tot_hunks)
             self._step_hunk(hunk, events)
 
     def _step_hunk(self, hunk, events):
@@ -104,16 +97,16 @@ class DiffWalker(object):
                 # if file exists in both arrays, it's changed,
                 # just remember to strip out the '+' at the
                 # beginning of the line
-                events.append(('changed', line_num, new_lines[i][1:]))
+                events.append(('change', line_num, new_lines[i][1:]))
                 line_num += 1
             elif i < old_len:
                 # there is no corresponding line in the new file,
-                # then this has been deleted
-                events.append(('deleted', line_num, None))
+                # then this has been removed
+                events.append(('remove', line_num, None))
             else:
                 # this must be an added line, strip out the '+' at the
                 # beginning
-                events.append(('added', line_num, new_lines[i][1:]))
+                events.append(('add', line_num, new_lines[i][1:]))
                 line_num += 1
 
     def _hunkize(self, chunk_wo_header, first_line_num):

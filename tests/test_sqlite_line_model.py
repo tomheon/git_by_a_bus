@@ -13,33 +13,14 @@ class TestSqliteLineModel(object):
     def teardown(self):
         self.conn.close()
 
-    def test_lookup_none_linenum(self):
-        eq_(None, self.model.lookup_line_id('hi', 'there', None))
-
-    def test_lookup_create_remove(self):
-        eq_(None, self.model.lookup_line_id('no such proj', 'no such file', 100))
-        self.model.add_line('proj', 'fil', 12, 'hi there')
-        eq_(None, self.model.lookup_line_id('no such proj', 'no such file', 100))                
-        line_id = self.model.lookup_line_id('proj', 'fil', 12)
-        ok_(line_id)
-        self.model.remove_line(line_id)
-        eq_(None, self.model.lookup_line_id('no such proj', 'no such file', 100))
-
-    def test_get_change(self):
-        eq_(None, self.model.get_line(0))
-        self.model.add_line('proj', 'fil', 12, 'hi there')
-        line_id = self.model.lookup_line_id('proj', 'fil', 12)
-        ok_(line_id)
-        line = self.model.get_line(line_id)
-        eq_('proj', line.project)
-        eq_('fil', line.fname)
-        eq_(12, line.line_num)
-        eq_(line_id, line.line_id)
-        eq_('hi there', line.line)
-        self.model.change_line(line_id, 'bye here')
-        line = self.model.get_line(line_id)
-        eq_('proj', line.project)
-        eq_('fil', line.fname)
-        eq_(12, line.line_num)
-        eq_(line_id, line.line_id)
-        eq_('bye here', line.line)
+    def test_line_manip(self):
+        self.model.add_line(1, 'hi there')
+        eq_(['hi there'], self.model.get_lines())
+        self.model.add_line(2, 'goodbye')
+        eq_(['hi there', 'goodbye'], self.model.get_lines())
+        self.model.add_line(1, 'oh yeah')
+        eq_(['oh yeah', 'hi there', 'goodbye'], self.model.get_lines())
+        self.model.change_line(2, 'nope')
+        eq_(['oh yeah', 'nope', 'goodbye'], self.model.get_lines())        
+        self.model.remove_line(2)
+        eq_(['oh yeah', 'goodbye'], self.model.get_lines())        

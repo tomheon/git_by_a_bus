@@ -10,6 +10,9 @@ class SqliteKnowledgeModel(object):
 
     SAFE_KNOWLEDGE_ACCT_ID = 1
     SAFE_AUTHOR_ID = 1
+    # scale by 1000 to make the numbers larger and less likely to
+    # underflow on large numbers of changes
+    KNOWLEDGE_PER_LINE_ADDED = 1000.0
 
     def __init__(self, conn, change_knowledge_constant, risk_model):
         self.change_knowledge_constant = change_knowledge_constant
@@ -18,28 +21,34 @@ class SqliteKnowledgeModel(object):
         self.cursor = conn.cursor()
         self._create_tables()
 
-    def line_changed(self, author, line_id):
+    def apply_change(self, changetype, author, line_num):
+        todo = {'change': self.line_changed,
+                'remove': self.line_removed,
+                'add': self.line_added}
+        todo[changetype](author, line_num)
+
+    def line_changed(self, author, line_num):
         author_id = self._lookup_or_create_author(author)
-        knowledge_created = self.change_knowledge_constant
-        knowledge_acquired = 1.0 - self.change_knowledge_constant
-        tot_line_knowledge = float(self._tot_line_knowledge(line_id))
+        knowledge_created = self.change_knowledge_constant * self.KNOWLEDGE_PER_LINE_ADDED
+        knowledge_acquired = (1.0 - self.change_knowledge_constant) * self.KNOWLEDGE_PER_LINE_ADDED
+        tot_line_knowledge = float(self._tot_line_knowledge(line_num))
         knowledge_acquired_pct = 0.0
         if tot_line_knowledge:
             knowledge_acquired_pct = knowledge_acquired / tot_line_knowledge
-        self._redistribute_knowledge(author, author_id, line_id, knowledge_acquired_pct)
+        self._redistribute_knowledge(author, author_id, line_num, knowledge_acquired_pct)
         knowledge_acct_id = self._lookup_or_create_knowledge_acct([author])
-        self._adjust_knowledge(knowledge_acct_id, line_id, knowledge_created)
+        self._adjust_knowledge(knowledge_acct_id, line_num, knowledge_created)
         self.conn.commit()        
 
-    def line_removed(self, author, line_id):
-        knowledge_acct_ids = self._accts_with_knowledge_of(line_id)
+    def line_removed(self, author, line_num):
+        knowledge_acct_ids = self._accts_with_knowledge_of(line_num)
         for knowledge_acct_id in knowledge_acct_ids:
-            self._destroy_line_knowledge(knowledge_acct_id, line_id)
+            self._destroy_line_knowledge(knowledge_acct_id, line_num)
         self.conn.commit()
 
-    def line_added(self, author, line_id):
+    def line_added(self, author, line_num):
         knowledge_acct_id = self._lookup_or_create_knowledge_acct([author])
-        self._adjust_knowledge(knowledge_acct_id, line_id, 1.0)
+        self._adjust_knowledge(knowledge_acct_id, line_num, self.KNOWLEDGE_PER_LINE_ADDED)
         self.conn.commit()
 
     def get_knowledge_acct(self, knowledge_acct_id):
@@ -53,17 +62,17 @@ class SqliteKnowledgeModel(object):
 
     # implementation
 
-    def _destroy_line_knowledge(self, knowledge_acct_id, line_id):
-        delete = "DELETE FROM lineknowledge WHERE knowledgeacctid = ? and lineid = ?;"
-        self.cursor.execute(delete, (knowledge_acct_id, line_id))
+    def _destroy_line_knowledge(self, knowledge_acct_id, line_num):
+        delete = "DELETE FROM lineknowledge WHERE knowledgeacctid = ? and linenum = ?;"
+        self.cursor.execute(delete, (knowledge_acct_id, line_num))
         self.conn.commit()
 
-    def _redistribute_knowledge(self, author, author_id, line_id, redist_pct):
-        knowledge_acct_ids = self._accts_with_knowledge_of(line_id)
+    def _redistribute_knowledge(self, author, author_id, line_num, redist_pct):
+        knowledge_acct_ids = self._accts_with_knowledge_of(line_num)
         for knowledge_acct_id in knowledge_acct_ids:
             knowledge_acct = self.get_knowledge_acct(knowledge_acct_id)
             if author not in knowledge_acct.authors:
-                old_acct_knowledge = self._knowledge_in_acct(knowledge_acct_id, line_id)
+                old_acct_knowledge = self._knowledge_in_acct(knowledge_acct_id, line_num)
                 
                 new_authors = list(knowledge_acct.authors)
                 new_authors.append(author)
@@ -74,31 +83,31 @@ class SqliteKnowledgeModel(object):
                     new_knowledge_acct_id = self._lookup_or_create_knowledge_acct(new_authors)
 
                 knowledge_to_dist = old_acct_knowledge * redist_pct
-                self._adjust_knowledge(knowledge_acct_id, line_id, -knowledge_to_dist)
-                self._adjust_knowledge(new_knowledge_acct_id, line_id, knowledge_to_dist)
+                self._adjust_knowledge(knowledge_acct_id, line_num, -knowledge_to_dist)
+                self._adjust_knowledge(new_knowledge_acct_id, line_num, knowledge_to_dist)
         self.conn.commit()
 
-    def _knowledge_in_acct(self, knowledge_acct_id, line_id):
-        select = "SELECT knowledge FROM lineknowledge WHERE knowledgeacctid = ? and lineid = ?"
-        self.cursor.execute(select, (knowledge_acct_id, line_id))
+    def _knowledge_in_acct(self, knowledge_acct_id, line_num):
+        select = "SELECT knowledge FROM lineknowledge WHERE knowledgeacctid = ? and linenum = ?"
+        self.cursor.execute(select, (knowledge_acct_id, line_num))
         row = self.cursor.fetchone()
         if not row:
             return 0.0
         else:
             return row[0]
         
-    def _accts_with_knowledge_of(self, line_id):
-        select = "SELECT knowledgeacctid FROM lineknowledge WHERE lineid = ? AND knowledgeacctid != ?;"
-        self.cursor.execute(select, (line_id, self.SAFE_KNOWLEDGE_ACCT_ID))
+    def _accts_with_knowledge_of(self, line_num):
+        select = "SELECT knowledgeacctid FROM lineknowledge WHERE linenum = ? AND knowledgeacctid != ?;"
+        self.cursor.execute(select, (line_num, self.SAFE_KNOWLEDGE_ACCT_ID))
         rows = self.cursor.fetchall()
         accts = [row[0] for row in rows]
         return accts
 
-    def _adjust_knowledge(self, knowledge_acct_id, line_id, adjustment):
-        insert = "INSERT OR IGNORE INTO lineknowledge (knowledgeacctid, lineid, knowledge) VALUES (?, ?, 0.0);"
-        self.cursor.execute(insert, (knowledge_acct_id, line_id))
-        update = "UPDATE lineknowledge SET knowledge = knowledge + ? WHERE knowledgeacctid = ? and lineid = ?;"
-        self.cursor.execute(update, (adjustment, knowledge_acct_id, line_id))
+    def _adjust_knowledge(self, knowledge_acct_id, line_num, adjustment):
+        insert = "INSERT OR IGNORE INTO lineknowledge (knowledgeacctid, linenum, knowledge) VALUES (?, ?, 0.0);"
+        self.cursor.execute(insert, (knowledge_acct_id, line_num))
+        update = "UPDATE lineknowledge SET knowledge = knowledge + ? WHERE knowledgeacctid = ? and linenum = ?;"
+        self.cursor.execute(update, (adjustment, knowledge_acct_id, line_num))
         self.conn.commit()
         
     def _lookup_or_create_knowledge_acct(self, authors):
@@ -123,7 +132,6 @@ class SqliteKnowledgeModel(object):
             row = [knowledge_acct_id]
         return row[0]
 
-
     def _lookup_or_create_author(self, author):
         insert = "INSERT OR IGNORE INTO authors (author) VALUES (?);"
         self.cursor.execute(insert, (unicode(author),))
@@ -131,6 +139,12 @@ class SqliteKnowledgeModel(object):
         self.cursor.execute(select, (author,))
         row = self.cursor.fetchone()
         return row[0]
+
+    def _tot_line_knowledge(self, line_num):
+        sql = "SELECT SUM(knowledge) FROM lineknowledge WHERE linenum = ?;"
+        self.cursor.execute(sql, (line_num,))
+        row = self.cursor.fetchone()
+        return row[0] or 0.0
 
     def _create_tables(self):
         sqls = ["CREATE TABLE IF NOT EXISTS authors (authorid INTEGER PRIMARY KEY ASC, author TEXT);",
@@ -144,16 +158,7 @@ class SqliteKnowledgeModel(object):
                 "CREATE TABLE IF NOT EXISTS knowledgeaccts_authors (knowledgeacctid INTEGER, authorid INTEGER, PRIMARY KEY(knowledgeacctid, authorid));",
                 # associate the safe user and knowledge acct
                 "INSERT OR IGNORE INTO knowledgeaccts_authors (knowledgeacctid, authorid) VALUES (1, 1);",
-                "CREATE TABLE IF NOT EXISTS lineknowledge (lineid INTEGER, knowledgeacctid INTEGER, knowledge REAL, PRIMARY KEY(lineid, knowledgeacctid));"]
+                "CREATE TABLE IF NOT EXISTS lineknowledge (linenum INTEGER, knowledgeacctid INTEGER, knowledge REAL, PRIMARY KEY(linenum, knowledgeacctid));"]
         for s in sqls:
             self.conn.execute(s)
-
-    def _tot_line_knowledge(self, line_id):
-        sql = "SELECT SUM(knowledge) FROM lineknowledge WHERE lineid = ?;"
-        self.cursor.execute(sql, (line_id,))
-        row = self.cursor.fetchone()
-        if not row or not row[0]:
-            return 0
-        else:
-            return row[0]
 
