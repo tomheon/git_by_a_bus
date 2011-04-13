@@ -9,8 +9,8 @@ class RiskModel(object):
         self._parse_departed(departed_fname)
 
     def get_bus_risk(self, author):
-        if author is None:
-            return risk_threshold
+        if not author or not author.strip():
+            return self.risk_threshold
         if author not in self.bus_risks:
             self.bus_risks[author] = self.default_bus_risk
         return self.bus_risks[author]

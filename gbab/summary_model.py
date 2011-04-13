@@ -27,14 +27,52 @@ class SummaryModel(object):
         for i, line_summary in enumerate(line_summaries):
             line_num = i + 1
             line, allocations = line_summary
-            line_id = self._create_line(line, line_num, file_id)
+            line_id = self._create_line(line.decode('utf-8'), line_num, file_id)
             for authors, knowledge, risk, orphaned in allocations:
                 authors = [self._safe_author_name(author) for author in authors]
                 author_group_id = self._find_or_create_author_group(authors)
                 self._create_allocation(knowledge, risk, orphaned, author_group_id, line_id)
         self.conn.commit()
-        
+
+    def project_files(self, project):
+        project_id = self._find_or_create_project(project)
+        select = "SELECT files.fileid, files.fname, files.dirid FROM files, dirs WHERE files.dirid = dirs.dirid AND dirs.projectid = ?;"
+        self.cursor.execute(select, (project_id,))
+        _fnames = []
+        results = []
+        for row in self.cursor.fetchall():
+            _fnames.append((row[2], row[1], row[0]))
+        for dir_id, fname, file_id in _fnames:
+            results.append((file_id, os.path.join(self._recons_dir(dir_id), fname)))
+
+        return results
+
+    def file_lines(self, file_id):
+        select = "SELECT SUM(knowledge), SUM(risk), SUM(orphaned), line, lines.lineid FROM " + \
+                 "lines LEFT OUTER JOIN allocations ON lines.lineid = allocations.lineid " + \
+                 "WHERE lines.fileid = ? GROUP BY lines.lineid ORDER BY linenum;"
+        self.cursor.execute(select, (file_id,))
+        return [(self._zero_if_none(row[0]),
+                 self._zero_if_none(row[1]),
+                 self._zero_if_none(row[2]), row[3].encode('utf-8')) for row in self.cursor.fetchall()]
+             
     # implementation
+
+    def _zero_if_none(self, val):
+        if val is None:
+            return 0.0
+        else:
+            return val
+
+    def _recons_dir(self, dir_id):
+        segs = []
+        select = "SELECT dir, parentdirid FROM dirs WHERE dirid = ?;"
+        while dir_id:
+            self.cursor.execute(select, (dir_id,))
+            dirname, dir_id = self.cursor.fetchone()
+            segs.append(dirname)
+        segs.reverse()
+        return os.path.join(*segs)
 
     def _safe_author_name(self, author):
         if not author:
@@ -76,10 +114,14 @@ class SummaryModel(object):
         return self.cursor.fetchone()[0]
 
     def _create_line(self, line, line_num, file_id):
-        insert = "INSERT INTO lines (line, linenum, fileid) VALUES (?, ?, ?);"
-        self.cursor.execute(insert, (line, line_num, file_id))
-        select = "SELECT lineid FROM lines WHERE linenum = ? AND fileid = ?;"
-        self.cursor.execute(select, (line_num, file_id))
+        try:
+            insert = "INSERT INTO lines (line, linenum, fileid) VALUES (?, ?, ?);"
+            self.cursor.execute(insert, (line, line_num, file_id))
+            select = "SELECT lineid FROM lines WHERE linenum = ? AND fileid = ?;"
+            self.cursor.execute(select, (line_num, file_id))
+        except:
+            import sys
+            print >> sys.stderr, repr(line), repr(line_num), repr(file_id)
         return self.cursor.fetchone()[0]
 
     def _create_file(self, fname, parent_dir_id):
@@ -98,9 +140,9 @@ class SummaryModel(object):
 
     def _find_or_create_dir(self, dirname, project_id, parent_dir_id):
         insert = "INSERT OR IGNORE INTO dirs (dir, parentdirid, projectid) VALUES (?, ?, ?);"
-        self.cursor.execute(insert, (dirname, project_id, parent_dir_id))
+        self.cursor.execute(insert, (dirname, parent_dir_id, project_id))
         select = "SELECT dirid FROM dirs WHERE dir = ? AND parentdirid = ? and projectid = ?;"
-        self.cursor.execute(select, (dirname, project_id, parent_dir_id))
+        self.cursor.execute(select, (dirname, parent_dir_id, project_id))
         return self.cursor.fetchone()[0]
 
     def _split_all_dirs(self, dirname):
@@ -119,7 +161,6 @@ class SummaryModel(object):
 
         all_dirs.reverse()
         return all_dirs
-            
 
     def _adjust_fname(self, repo_root, project_root, fname):
         root_diff = project_root[len(repo_root):]

@@ -36,7 +36,7 @@ class LineModel(object):
     def get_lines(self):
         sql = "SELECT line FROM lines ORDER BY linenum ASC;"
         self.curs.execute(sql)
-        return [row[0] for row in self.curs.fetchall()]
+        return [row[0].encode('utf-8') for row in self.curs.fetchall()]
 
     # implementation
 

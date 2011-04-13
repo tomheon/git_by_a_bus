@@ -13,6 +13,7 @@ from gbab.knowledge_model import KnowledgeModel
 from gbab.risk_model import RiskModel
 from gbab.line_model import LineModel
 from gbab.summary_model import SummaryModel
+from gbab.summary_renderer import SummaryRenderer
 
 # used in workaround for multiprocessing bug
 REALLY_LONG_TIME = 86400 * 10
@@ -86,7 +87,7 @@ def analyze(a_id, inqueue, outqueue,
             verbose):
     # since the risk model is only populated from files and is read
     # only, we can create it once per process
-    risk_model = RiskModel(risk_threshold, default_bus_risk, departed_fname, bus_risk_fname)
+    risk_model = RiskModel(risk_threshold, default_bus_risk, bus_risk_fname, departed_fname)
     
     changes_processed = 0
     
@@ -125,7 +126,7 @@ def analyze(a_id, inqueue, outqueue,
     return changes_processed
 
 def _parse_interest_regexps(options):
-    interesting = options.interesting
+    interesting = options.interesting or r'\.java$ \.cs$ \.py$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.perl$ \.rb$ \.sh$'.split(' ')
     not_interesting = options.not_interesting or []
 
     if options.case_sensitive:
@@ -149,7 +150,10 @@ def _interesting_fnames(repo, interesting, not_interesting):
     return [fname for fname in repo.ls() if _is_interesting(fname, interesting, not_interesting)]
 
 def _render_summary(summary_db, output_dir):
-    pass
+    conn = sqlite3.connect(summary_db)
+    renderer = SummaryRenderer(SummaryModel(conn), output_dir)
+    renderer.render_all()
+    conn.close()
 
 def main(options, args):
     if options.risk_threshold is None:
@@ -172,9 +176,25 @@ def main(options, args):
         print >> sys.stderr, "No interesting files found, exiting."
         exit(1)
 
+
     mgr = Manager()
     analyzer_queue = mgr.Queue()
     summarizer_queue = mgr.Queue()
+
+    #fnames = [('project_name', project_root, fname, analyzer_queue, options.verbose) for fname in fnames]
+    # for fname in fnames:
+    #     parse_history(fname)
+    
+    # analyzer_queue.put(None)
+    
+    # analyze(1, analyzer_queue, summarizer_queue, options.departed_fname, options.risk_threshold, options.default_bus_risk, options.bus_risk_fname,
+    #         options.knowledge_creation_constant,
+    #         options.verbose)
+
+    # summarizer_queue.put(None)
+    # summary_db = summarize(options.output_dir, summarizer_queue)
+    # _render_summary(summary_db, options.output_dir)
+    # exit(1)
 
     # user-chosen procs +1 process for the summarizer
     pool = Pool(options.num_analyzer_procs + options.num_git_procs + 1)
@@ -227,8 +247,7 @@ if __name__ == '__main__':
     parser.add_option('--interesting', metavar="REGEXP", dest='interesting', action='append',
                       help='Regular expression to determine which files should be included in calculations.  ' + \
                       'May be repeated, any match is sufficient to indicate interest. ' + \
-                      'Defaults are \.java$ \.cs$ \.py$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.rb$',
-                      default=r'\.java$ \.cs$ \.py$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.perl$ \.rb$ \.sh$'.split(' '))
+                      'Defaults are \.java$ \.cs$ \.py$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.rb$')
     parser.add_option('--not-interesting', metavar="REGEXP", dest="not_interesting", action='append',
                       help="Regular expression to override interesting files.  May be repeated, any match is enough to squelch interest.")
     parser.add_option("--case-sensitive", dest="case_sensitive", action="store_true", default=False,

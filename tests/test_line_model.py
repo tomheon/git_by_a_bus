@@ -4,7 +4,7 @@ from nose.tools import ok_, eq_
 
 from gbab.line_model import LineModel
 
-class TestLineModel(object):
+class TestxkLineModel(object):
 
     def setup(self):
         self.conn = sqlite3.connect(':memory:')

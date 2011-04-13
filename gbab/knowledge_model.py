@@ -28,6 +28,9 @@ class KnowledgeModel(object):
         todo[changetype](author, line_num)
 
     def line_changed(self, author, line_num):
+        #import sys
+        #if author == 'dabdinoor':
+        #    print >> sys.stderr, self.knowledge_summary(line_num)
         author_id = self._lookup_or_create_author(author)
         knowledge_created = self.change_knowledge_constant * self.KNOWLEDGE_PER_LINE_ADDED
         knowledge_acquired = (1.0 - self.change_knowledge_constant) * self.KNOWLEDGE_PER_LINE_ADDED
@@ -38,16 +41,20 @@ class KnowledgeModel(object):
         self._redistribute_knowledge(author, author_id, line_num, knowledge_acquired_pct, self.risk_model)
         knowledge_acct_id = self._lookup_or_create_knowledge_acct([author])
         self._adjust_knowledge(knowledge_acct_id, line_num, knowledge_created)
-        self.conn.commit()        
+        self.conn.commit()
+        #        if author == 'dabdinoor':
+        #    print >> sys.stderr, "AFTER", self.knowledge_summary(line_num)
 
     def line_removed(self, author, line_num):
-        knowledge_acct_ids = self._non_safe_accts_with_knowledge_of(line_num)
+        knowledge_acct_ids = self._all_accts_with_knowledge_of(line_num)
         for knowledge_acct_id in knowledge_acct_ids:
             self._destroy_line_knowledge(knowledge_acct_id, line_num)
+        self._bump_all_lines_from(line_num, -1)
         self.conn.commit()
 
     def line_added(self, author, line_num):
         knowledge_acct_id = self._lookup_or_create_knowledge_acct([author])
+        self._bump_all_lines_from(line_num - 1, 1)        
         self._adjust_knowledge(knowledge_acct_id, line_num, self.KNOWLEDGE_PER_LINE_ADDED)
         self.conn.commit()
 
@@ -59,6 +66,10 @@ class KnowledgeModel(object):
         return summary
 
     # implementation
+
+    def _bump_all_lines_from(self, line_num, adjustment):
+        sql = "UPDATE lineknowledge SET linenum = linenum + ? WHERE linenum > ?;"
+        self.cursor.execute(sql, (adjustment, line_num))
 
     def _get_knowledge_acct(self, knowledge_acct_id):
         select = "SELECT knowledgeacctid, authors FROM knowledgeaccts WHERE knowledgeacctid = ?"
@@ -83,7 +94,6 @@ class KnowledgeModel(object):
             knowledge_acct = self._get_knowledge_acct(knowledge_acct_id)
             if author not in knowledge_acct.authors:
                 old_acct_knowledge = self._knowledge_in_acct(knowledge_acct_id, line_num)
-                
                 new_authors = list(knowledge_acct.authors)
                 if all([risk_model.is_departed(a) for a in new_authors]):
                     # don't create shared accounts for knowledge from
@@ -119,9 +129,20 @@ class KnowledgeModel(object):
         accts = [row[0] for row in rows]
         return accts
 
+    def _all_accts_with_knowledge_of(self, line_num):
+        select = "SELECT knowledgeacctid FROM lineknowledge WHERE linenum = ?;"
+        self.cursor.execute(select, (line_num,))
+        rows = self.cursor.fetchall()
+        accts = [row[0] for row in rows]
+        return accts
+
     def _adjust_knowledge(self, knowledge_acct_id, line_num, adjustment):
-        insert = "INSERT OR IGNORE INTO lineknowledge (knowledgeacctid, linenum, knowledge) VALUES (?, ?, 0.0);"
-        self.cursor.execute(insert, (knowledge_acct_id, line_num))
+        select = "SELECT 1 FROM lineknowledge WHERE knowledgeacctid = ? and linenum = ?;"
+        self.cursor.execute(select, (knowledge_acct_id, line_num))
+        row = self.cursor.fetchone()
+        if not row or not row[0]:
+            insert = "INSERT INTO lineknowledge (knowledgeacctid, linenum, knowledge) VALUES (?, ?, 0.0);"
+            self.cursor.execute(insert, (knowledge_acct_id, line_num))
         update = "UPDATE lineknowledge SET knowledge = knowledge + ? WHERE knowledgeacctid = ? and linenum = ?;"
         self.cursor.execute(update, (adjustment, knowledge_acct_id, line_num))
         self.conn.commit()
@@ -174,7 +195,7 @@ class KnowledgeModel(object):
                 "CREATE TABLE IF NOT EXISTS knowledgeaccts_authors (knowledgeacctid INTEGER, authorid INTEGER, PRIMARY KEY(knowledgeacctid, authorid));",
                 # associate the safe user and knowledge acct
                 "INSERT OR IGNORE INTO knowledgeaccts_authors (knowledgeacctid, authorid) VALUES (1, 1);",
-                "CREATE TABLE IF NOT EXISTS lineknowledge (linenum INTEGER, knowledgeacctid INTEGER, knowledge REAL, PRIMARY KEY(linenum, knowledgeacctid));"]
+                "CREATE TABLE IF NOT EXISTS lineknowledge (linenum INTEGER, knowledgeacctid INTEGER, knowledge REAL);"]
         for s in sqls:
             self.conn.execute(s)
 
