@@ -5,8 +5,16 @@ import sys
 from subprocess import Popen, PIPE
 
 class GitRepo(object):
+    """
+    Helps perform operations on a git repo.
+    """
 
     def __init__(self, project_root, git_exe):
+        """
+        project_root: the real path to the git repository root
+        
+        git_exe: the path to the git executable
+        """
         self.project_root = project_root
         self.git_exe = git_exe
 
@@ -34,7 +42,7 @@ class GitRepo(object):
         """
         Return parsed logs in the form:
 
-        [(author, diff]
+        [(author, diff), ...]
         """
         return self._parse_log(fname)
 
@@ -52,7 +60,6 @@ class GitRepo(object):
         if chdir:
             os.chdir(cwd)
         return root
-
 
     # implementation
 
@@ -89,10 +96,12 @@ class GitRepo(object):
                     raise ValueError("Could not parse author")
                 parsed_entries.append((author, diff))
             except ValueError as e:
+                # these errors are expected when we can't find an author, in
+                # which case there isn't much we can do by way of author-based analysis.
                 pass
-                #print >> sys.stderr, "Could not parse git log entry %s" % entry
-                #print >> sys.stderr, e
 
+        # put the oldest entries first (git log shows the newest
+        # first)
         parsed_entries.reverse()
 
         return parsed_entries

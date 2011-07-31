@@ -12,11 +12,11 @@ class SummaryModel(object):
     def summarize(self, condensed_analysis):
         # condensed analysis is of the form:
         # (project, repo_root, project_root, fname, [(line, [([author], knowledge, risk, orphaned)])])
-        project, repo_root, project_root, fname, line_summaries = condensed_analysis
+        repo_root, project_root, fname, line_summaries = condensed_analysis
 
         fname = self._adjust_fname(repo_root, project_root, fname)
 
-        project_id = self._find_or_create_project(project)
+        project_id = self._find_or_create_project(project_root)
 
         parent_dir_id = 0
         for dirname in self._split_all_dirs(os.path.split(fname)[0]):

@@ -7,8 +7,8 @@ class SummaryRenderer(object):
         self.summary_model = summary_model
         self.output_dir = output_dir
 
-    def render_all(self):
-        for file_id, fname in self.summary_model.project_files('project_name'): 
+    def render_all(self, project_root):
+        for file_id, fname in self.summary_model.project_files(project_root): 
             self._render_file_page(file_id, fname)
 
     # implementation
