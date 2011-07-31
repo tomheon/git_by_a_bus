@@ -49,6 +49,9 @@ def main(options, args):
         print >> sys.stderr, "No interesting files found, exiting."
         exit(1)
 
+    if options.verbose:
+        print >> sys.stderr, "Found %d interesting files" % len(fnames)
+
     # use queues for the various processes we will kick off to
     # communicate with each other.
     mgr = Manager()
