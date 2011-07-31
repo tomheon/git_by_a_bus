@@ -179,11 +179,15 @@ if __name__ == '__main__':
     if len(args) != 1:
         parser.error("one project_root_to_analyze required, or pass -h for help.")
 
-    try:
-        os.mkdir(options.output_dir)
-    except:
-        exit_with_error("Output directory already exists, refusing to continue")
 
+    if os.path.isdir(options.output_dir):
+        exit_with_error("Output directory %s already exists, refusing to continue" % options.output_dir)
+        
+    try:
+        os.makedirs(options.output_dir)
+    except OSError as exc:
+        exit_with_error("Error attempting to make output dir %s" % str(exc))
+        
     main(options, args)
     
     
