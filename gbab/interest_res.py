@@ -1,5 +1,7 @@
 import re
 
+DEFAULT_INTERESTING_RES = r'\.java$ \.cs$ \.py$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.perl$ \.rb$ \.sh$ \.js$'
+
 def parse_interest_regexps(options):
     """
     Given command line options, generate a list of regexps which
@@ -8,7 +10,7 @@ def parse_interest_regexps(options):
 
     return (interesting_res, uninteresting_res)
     """
-    interesting_res = options.interesting or r'\.java$ \.cs$ \.py$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.perl$ \.rb$ \.sh$'.split(' ')
+    interesting_res = options.interesting or DEFAULT_INTERESTING_RES.split(' ')
     not_interesting_res = options.not_interesting or []
 
     if options.case_sensitive:

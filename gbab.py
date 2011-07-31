@@ -9,7 +9,7 @@ from optparse import OptionParser, OptionGroup
 
 from gbab.git_repo import GitRepo
 from gbab.interest_res import parse_interest_regexps
-from gbab.interest_res import interesting_fnames
+from gbab.interest_res import interesting_fnames, DEFAULT_INTERESTING_RES
 from gbab.analyze import analyze
 from gbab.summarize import summarize
 from gbab.parse_history import parse_history
@@ -138,7 +138,7 @@ if __name__ == '__main__':
     input_group.add_option('--interesting', metavar="REGEXP", dest='interesting', action='append',
                       help='Regular expression to determine which files should be included in calculations.  ' + \
                       'May be repeated, any match is sufficient to indicate interest. ' + \
-                      'Defaults are \.java$ \.cs$ \.py$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.rb$')
+                      'Defaults are %s' % DEFAULT_INTERESTING_RES)
     input_group.add_option('--not-interesting', metavar="REGEXP", dest="not_interesting", action='append',
                            help="Regular expression to override interesting files.  May be repeated, " + \
                                "any match is enough to squelch interest.")
