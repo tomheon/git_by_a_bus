@@ -6,6 +6,10 @@ import cgi
 # max number of risky authors to write in summmary
 NUM_RISKIEST_AUTHORS = 10
 
+# max number of risky files to write in summmary
+NUM_RISKIEST_FILES = 10
+
+
 class SummaryRenderer(object):
 
     def __init__(self, summary_model, output_dir):
@@ -26,9 +30,30 @@ class SummaryRenderer(object):
             fil.write("<html>\n<head>\n<title>%s</title>\n</head>\n" % summary_str)
             fil.write("<body>\n")
             fil.write("<h1>%s</h1>" % summary_str)
+            self._render_total_stats(fil)
             self._render_riskiest_authors(fil)
+            self._render_riskiest_files(fil)
             fil.write("</body>\n</html>\n")
 
+    def _render_total_stats(self, fil):
+        tot_knowledge = self.summary_model.total_knowledge()
+        fil.write("<p>Total knowledge: %d over %d files</p>" % (tot_knowledge,
+                                                                self.summary_model.count_files()))
+        tot_risk = self.summary_model.total_risk()
+        fil.write("<p>At risk: %d (%.2f percent)</p>" % (tot_risk,
+                                                         float(tot_risk) / float(tot_knowledge) * 100.0))
+
+        tot_orphaned = self.summary_model.total_orphaned()
+        fil.write("<p>Orphaned: %d (%.2f percent)</p>" % (tot_orphaned,
+                                                         float(tot_orphaned) / float(tot_knowledge) * 100.0))
+
+    def _render_riskiest_files(self, fil):
+        fil.write("<p>Top %d files by risk</p>" % NUM_RISKIEST_FILES)
+        fil.write("<table>\n<tr>\n<th>File</th>\n<th>Risk</th>\n</tr>\n")
+        for (fid, risk) in self.summary_model.fileids_with_risk(top=NUM_RISKIEST_FILES):
+            fil.write("<tr>\n<td>%s</td>\n<td>%d</td>\n</tr>\n" % (self.summary_model.fpath(fid), int(risk)))
+        fil.write("</table>")
+        
     def _render_riskiest_authors(self, fil):
         fil.write("<p>Top %d authors/groups by (bus_risk * knowledge)</p>" % NUM_RISKIEST_AUTHORS)
         fil.write("<table>\n<tr>\n<th>Author(s)</th>\n<th>Bus Risk * Knowledge</th>\n</tr>\n")

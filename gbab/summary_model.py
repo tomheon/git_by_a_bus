@@ -34,6 +34,26 @@ class SummaryModel(object):
                 self._create_allocation(knowledge, risk, orphaned, author_group_id, line_id)
         self.conn.commit()
 
+    def total_knowledge(self):
+        select = "SELECT SUM(knowledge) FROM allocations;"
+        self.cursor.execute(select, ())
+        return self.cursor.fetchall()[0][0]
+
+    def total_risk(self):
+        select = "SELECT SUM(risk) FROM allocations;"
+        self.cursor.execute(select, ())
+        return self.cursor.fetchall()[0][0]
+
+    def total_orphaned(self):
+        select = "SELECT SUM(orphaned) FROM allocations;"
+        self.cursor.execute(select, ())
+        return self.cursor.fetchall()[0][0]
+
+    def count_files(self):
+        select = "SELECT COUNT(*) FROM files;"
+        self.cursor.execute(select, ())
+        return self.cursor.fetchall()[0][0]
+        
     def authorgroups_with_risk(self, top=None):
         limit = ''
         if top:
@@ -43,8 +63,30 @@ class SummaryModel(object):
         self.cursor.execute(select, ())
         ags_with_risk = []
         for row in self.cursor.fetchall():
-            ags_with_risk.append((row[0], row[1]))
+            ags_with_risk.append((row[0], row[1] if row[1] else 0))
         return ags_with_risk
+
+    def fileids_with_risk(self, top=None):
+        limit = ''
+        if top:
+            limit = "LIMIT %d" % top
+        select = "SELECT files.fileid, SUM(risk) AS sum_risk " + \
+            "FROM files LEFT JOIN lines ON files.fileid = lines.fileid " + \
+            "LEFT JOIN allocations on allocations.lineid = lines.lineid " + \
+            "GROUP BY files.fileid ORDER BY sum_risk DESC %s;" % limit
+        self.cursor.execute(select, ())
+        fnames_with_risk = []
+        for row in self.cursor.fetchall():
+            fnames_with_risk.append((row[0], row[1] if row[1] else 0))
+        return fnames_with_risk
+
+    def fpath(self, fileid):
+        select = "SELECT fname, dirid FROM files WHERE fileid = ?;"
+        self.cursor.execute(select, (fileid,))
+        fname, dirid = self.cursor.fetchall()[0]
+        dirs = self._recons_dirs(dirid)
+        dirs.append(fname)
+        return os.path.join(*dirs)
 
     def project_files(self, project):
         project_id = self._find_or_create_project(project)
@@ -184,6 +226,18 @@ class SummaryModel(object):
         if fname.startswith(os.path.sep):
             fname = fname[1:]
         return fname
+
+    def _recons_dirs(self, dirid):
+        dirs = []
+        parentdirid = None
+        while parentdirid != 0:
+            select = "SELECT dir, parentdirid FROM dirs WHERE dirid = ?;"
+            self.cursor.execute(select, (dirid,))
+            dirname, parentdirid = self.cursor.fetchall()[0]
+            dirs.append(dirname)
+            dirid = parentdirid
+        dirs.reverse()
+        return dirs
 
     def _create_tables(self):
         sql = ["CREATE TABLE IF NOT EXISTS projects (projectid INTEGER PRIMARY KEY ASC, project TEXT);",
