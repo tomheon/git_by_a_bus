@@ -4,3 +4,4 @@ output
 .coverage
 departed.txt
 bus_risks.txt
+.ropeproject
