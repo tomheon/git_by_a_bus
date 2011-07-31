@@ -5,7 +5,7 @@ import sys
 import os
 
 from multiprocessing import Pool, Queue, Manager
-from optparse import OptionParser
+from optparse import OptionParser, OptionGroup
 
 from gbab.git_repo import GitRepo
 from gbab.interest_res import parse_interest_regexps
@@ -129,36 +129,55 @@ if __name__ == '__main__':
     usage = "usage: %prog [options] project_root_to_analyze"
 
     parser = OptionParser(usage=usage)
-    parser.add_option('--departed-file', dest='departed_fname', metavar='FILE',
-                      help='File listing departed devs, one per line')
-    parser.add_option('--bus-risk-file', dest='bus_risk_fname', metavar='FILE',
-                      help='File of dev=float lines (e.g. ejorgensen=0.4) with custom bus risks for devs')
-    parser.add_option("--num-git-procs", metavar="NUMBER", dest="num_git_procs", default=3,
-                      help="The number of git processes to run simultaneously (defaults to 3)")
-    parser.add_option("--num-analyzer-procs", metavar="NUMBER", dest="num_analyzer_procs", default=3,
-                      help="The number of analyzer processes to run (defaults to 3).")
-    parser.add_option('--interesting', metavar="REGEXP", dest='interesting', action='append',
+
+    input_group = OptionGroup(parser, "Input Options", 
+                              "Options to instruct GBAB which files to analyze and how risky to consider different authors")
+    input_group.add_option('--interesting', metavar="REGEXP", dest='interesting', action='append',
                       help='Regular expression to determine which files should be included in calculations.  ' + \
                       'May be repeated, any match is sufficient to indicate interest. ' + \
                       'Defaults are \.java$ \.cs$ \.py$ \.c$ \.cpp$ \.h$ \.hpp$ \.pl$ \.rb$')
-    parser.add_option('--not-interesting', metavar="REGEXP", dest="not_interesting", action='append',
-                      help="Regular expression to override interesting files.  May be repeated, " + \
-                          "any match is enough to squelch interest.")
-    parser.add_option("--case-sensitive", dest="case_sensitive", action="store_true", default=False,
-                      help="Use case sensitive regexps when determining interesting files (default is case-insensitive")
+    input_group.add_option('--not-interesting', metavar="REGEXP", dest="not_interesting", action='append',
+                           help="Regular expression to override interesting files.  May be repeated, " + \
+                               "any match is enough to squelch interest.")
+    input_group.add_option("--case-sensitive", dest="case_sensitive", action="store_true", default=False,
+                           help="Use case sensitive regexps when determining interesting files (default is case-insensitive")
+    input_group.add_option('--departed-file', dest='departed_fname', metavar='FILE',
+                           help='File listing departed devs, one per line')
+    input_group.add_option('--bus-risk-file', dest='bus_risk_fname', metavar='FILE',
+                           help='File of dev=float lines (e.g. ejorgensen=0.4) with custom bus risks for devs')
+    input_group.add_option('--default-bus-risk', dest='default_bus_risk', default=0.1, metavar="FLOAT",
+                           help='Default risk that a dev will be hit by a bus in your analysis timeframe (defaults to 0.1).')
+    parser.add_option_group(input_group)
+
+    proc_group = OptionGroup(parser, "Multiprocessing Options", 
+                             "Options controlling how many processes GBAB spins up " + \
+                                 "(try upping these if you have CPU / memory to spare and you " + \
+                                 "are running against a large / old repository).")
+    proc_group.add_option("--num-git-procs", metavar="NUMBER", dest="num_git_procs", default=3,
+                          help="The number of git processes to run simultaneously (defaults to 3)")
+    proc_group.add_option("--num-analyzer-procs", metavar="NUMBER", dest="num_analyzer_procs", default=3,
+                          help="The number of analyzer processes to run (defaults to 3).")
+    parser.add_option_group(proc_group)
+
+    adv_group = OptionGroup(parser, "Advanced Tuning Options",
+                            "Options to tune the GBAB algorithm")
+    adv_group.add_option('--risk-threshold', dest='risk_threshold', default=None, metavar="FLOAT",
+                         help="Threshold past which to summarize risk (defaults to default bus risk cubed)")
+    adv_group.add_option('--knowledge-creation-constant', dest='knowledge_creation_constant', metavar='FLOAT', default=0.1,
+                         help='How much knowledge a changed line should create if a new line creates 1 (defaults to 0.1)')
+    parser.add_option_group(adv_group)
+
+
     parser.add_option('--git-exe', dest='git_exe', default='/usr/bin/env git',
                       help='Path to the git exe (defaults to "/usr/bin/env git")')
-    parser.add_option('--default-bus-risk', dest='default_bus_risk', default=0.1, metavar="FLOAT",
-                      help='Default risk that a dev will be hit by a bus in your analysis timeframe (defaults to 0.1).')
-    parser.add_option('--risk-threshold', dest='risk_threshold', default=None, metavar="FLOAT",
-                      help="Threshold past which to summarize risk (defaults to default bus risk cubed)")
-    parser.add_option('--knowledge-creation-constant', dest='knowledge_creation_constant', metavar='FLOAT', default=0.1,
-                      help='How much knowledge a changed line should create if a new line creates 1 (defaults to 0.1)')
     parser.add_option('--verbose', dest='verbose', default=False, action="store_true", help="Print comforting output")
     parser.add_option('--output', dest='output_dir', metavar='DIRNAME', default='output',
-                      help='Output directory for data files and html summary (defaults to "output"), error if already existsp')
+                      help='Output directory for data files and html summary (defaults to "output"), error if already exists')
     
     options, args = parser.parse_args()
+
+    if len(args) != 1:
+        parser.error("one project_root_to_analyze required, or pass -h for help.")
 
     try:
         os.mkdir(options.output_dir)
