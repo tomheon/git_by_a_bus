@@ -1,5 +1,10 @@
 import math
 import os
+import errno
+import cgi
+
+# max number of risky authors to write in summmary
+NUM_RISKIEST_AUTHORS = 10
 
 class SummaryRenderer(object):
 
@@ -8,19 +13,44 @@ class SummaryRenderer(object):
         self.output_dir = output_dir
 
     def render_all(self, project_root):
-        for file_id, fname in self.summary_model.project_files(project_root): 
-            self._render_file_page(file_id, fname)
+        self._create_files_dir()
+        self._render_index_page(project_root)
+        #for file_id, fname in self.summary_model.project_files(project_root): 
+        #    self._render_file_page(file_id, fname)
 
     # implementation
+
+    def _render_index_page(self, project_root):
+        with open(os.path.join("%s/index.html" % self.files_dir), "w") as fil:
+            summary_str = "Git by a Bus Summary for Project %s" % cgi.escape(os.path.basename(project_root))
+            fil.write("<html>\n<head>\n<title>%s</title>\n</head>\n" % summary_str)
+            fil.write("<body>\n")
+            fil.write("<h1>%s</h1>" % summary_str)
+            self._render_riskiest_authors(fil)
+            fil.write("</body>\n</html>\n")
+
+    def _render_riskiest_authors(self, fil):
+        fil.write("<p>Top %d authors/groups by (bus_risk * knowledge)</p>" % NUM_RISKIEST_AUTHORS)
+        fil.write("<table>\n<tr>\n<th>Author(s)</th>\n<th>Bus Risk * Knowledge</th>\n</tr>\n")
+        for (authstr, risk) in self.summary_model.authorgroups_with_risk(top=NUM_RISKIEST_AUTHORS):
+            fil.write("<tr>\n<td>%s</td>\n<td>%d</td>\n</tr>\n" % (authstr, int(risk)))
+        fil.write("</table>")
+            
+    def _create_files_dir(self):
+        self.files_dir = os.path.join(self.output_dir, 'files')
+
+        try:
+            os.mkdir(self.files_dir)
+        except OSError as exc:
+            if exc.errno == errno.EEXIST:
+                pass
+            else: 
+                raise
+            
 
     def _render_file_page(self, file_id, fname):
         summarized_lines = self.summary_model.file_lines(file_id)
 
-        try:
-            os.mkdir(os.path.join(self.output_dir, 'files'))
-        except:
-            pass
-        
         with open(os.path.join(self.output_dir, 'files', "%d.html" % file_id), "w") as fil:
             fil.write("<html>\n<head></head>\n<body>")
             fil.write("<table>\n<tr><th>Heatmap</th><th>Line</th></tr>\n")
@@ -56,10 +86,11 @@ if __name__ == '__main__':
     import os
 
     output_dir = sys.argv[1]
+    project_root = os.path.realpath(sys.argv[2])
     db_path = os.path.join(output_dir, 'summary.db')
     conn = sqlite3.connect(db_path)
     summary_model = SummaryModel(conn)
     summary_renderer = SummaryRenderer(summary_model, output_dir)
-    summary_renderer.render_all()
+    summary_renderer.render_all(project_root)
     
     

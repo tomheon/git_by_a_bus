@@ -34,6 +34,18 @@ class SummaryModel(object):
                 self._create_allocation(knowledge, risk, orphaned, author_group_id, line_id)
         self.conn.commit()
 
+    def authorgroups_with_risk(self, top=None):
+        limit = ''
+        if top:
+            limit = "LIMIT %d" % top
+        select = "SELECT authorsstr, SUM(risk) AS sum_risk FROM allocations, authorgroups WHERE allocations.authorgroupid " + \
+            "= authorgroups.authorgroupid GROUP BY authorsstr ORDER BY sum_risk DESC %s;" % limit
+        self.cursor.execute(select, ())
+        ags_with_risk = []
+        for row in self.cursor.fetchall():
+            ags_with_risk.append((row[0], row[1]))
+        return ags_with_risk
+
     def project_files(self, project):
         project_id = self._find_or_create_project(project)
         select = "SELECT files.fileid, files.fname, files.dirid FROM files, dirs WHERE files.dirid = dirs.dirid AND dirs.projectid = ?;"
@@ -184,6 +196,7 @@ class SummaryModel(object):
                "CREATE UNIQUE INDEX IF NOT EXISTS linesnumfile_idx ON lines (fileid, linenum);",
                "CREATE INDEX IF NOT EXISTS linesfile_idx ON lines (fileid);",
                "CREATE TABLE IF NOT EXISTS authors (authorid INTEGER PRIMARY KEY ASC, author TEXT);",
+               "CREATE UNIQUE INDEX IF NOT EXISTS authors_idx ON authors (author);",
                "CREATE TABLE IF NOT EXISTS authorgroups (authorgroupid INTEGER PRIMARY KEY ASC, authorsstr TEXT);",
                "CREATE UNIQUE INDEX IF NOT EXISTS authorgroupsstrs_idx ON authorgroups (authorsstr);",
                "CREATE TABLE IF NOT EXISTS authors_authorgroups (authorid INTEGER, authorgroupid INTEGER, PRIMARY KEY(authorid, authorgroupid));",

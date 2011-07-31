@@ -23,7 +23,7 @@ def parse_history(args):
         print >> sys.stderr, "Parsing history for %s" % fname
 
     try:
-        queue.put((repo_root, project_root, fname, [(author, diff_walker.walk(diff)) for (author, diff) in entries]))
+        queue.put((repo_root, project_root, fname, [(author.strip(), diff_walker.walk(diff)) for (author, diff) in entries]))
     except:
         print >> sys.stderr, "error", fname
     return True
