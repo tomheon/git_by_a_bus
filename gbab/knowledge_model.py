@@ -28,9 +28,6 @@ class KnowledgeModel(object):
         todo[changetype](author, line_num)
 
     def line_changed(self, author, line_num):
-        #import sys
-        #if author == 'dabdinoor':
-        #    print >> sys.stderr, self.knowledge_summary(line_num)
         author_id = self._lookup_or_create_author(author)
         knowledge_created = self.change_knowledge_constant * self.KNOWLEDGE_PER_LINE_ADDED
         knowledge_acquired = (1.0 - self.change_knowledge_constant) * self.KNOWLEDGE_PER_LINE_ADDED
@@ -42,8 +39,6 @@ class KnowledgeModel(object):
         knowledge_acct_id = self._lookup_or_create_knowledge_acct([author])
         self._adjust_knowledge(knowledge_acct_id, line_num, knowledge_created)
         self.conn.commit()
-        #        if author == 'dabdinoor':
-        #    print >> sys.stderr, "AFTER", self.knowledge_summary(line_num)
 
     def line_removed(self, author, line_num):
         knowledge_acct_ids = self._all_accts_with_knowledge_of(line_num)
