@@ -90,16 +90,22 @@ def _condense_analysis(repo_root, project_root, fname, line_model, knowledge_mod
     """
 
     line_condensations = []
+
     for i, line in enumerate(line_model.get_lines()):
         line_num = i + 1
         author_knowledges = knowledge_model.knowledge_summary(line_num)
+        # hold the (authors, knowledge, orphaned) for each knowledge
+        # allocation against this line, calculating the orphaned as
+        # needed.
         tmp = []
         for authors, knowledge in author_knowledges:
             orphaned = 0.0
             if all(risk_model.is_departed(author) for author in authors):
                 orphaned = knowledge
-                knowledge = 0.0
             tmp.append((authors, knowledge, orphaned))
+
+        # now calculate and add the risk, so it's (authors, knowledge,
+        # risk, orphaned)
         author_knowledges = tmp
         author_knowledges.sort()
         author_knowledges = [(authors,
@@ -111,6 +117,7 @@ def _condense_analysis(repo_root, project_root, fname, line_model, knowledge_mod
                               orphaned) for (authors,
                                              knowledge,
                                              orphaned) in author_knowledges]
+
         line_condensations.append((line, author_knowledges))
 
     return (repo_root, project_root, fname, line_condensations)
