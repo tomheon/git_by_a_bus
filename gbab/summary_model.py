@@ -108,7 +108,8 @@ class SummaryModel(object):
         self.cursor.execute(select, (file_id,))
         return [(self._zero_if_none(row[0]),
                  self._zero_if_none(row[1]),
-                 self._zero_if_none(row[2]), row[3].encode('utf-8')) for row in self.cursor.fetchall()]
+                 self._zero_if_none(row[2]), 
+                 row[3].encode('utf-8')) for row in self.cursor.fetchall()]
              
     # implementation
 
