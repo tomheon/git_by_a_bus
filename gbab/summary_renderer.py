@@ -2,6 +2,7 @@ import math
 import os
 import errno
 import cgi
+import json
 
 # max number of risky authors to write in summmary
 NUM_RISKIEST_AUTHORS = 10
@@ -19,10 +20,16 @@ class SummaryRenderer(object):
     def render_all(self, project_root):
         self._create_files_dir()
         self._render_index_page(project_root)
-        #for file_id, fname in self.summary_model.project_files(project_root): 
+        self._render_json(project_root)
+        #for file_id, fname in self.summary_model.project_files(project_root):
         #    self._render_file_page(file_id, fname)
 
     # implementation
+
+    def _render_json(self, project_root):
+        with open(os.path.join("%s/summary.json" % self.files_dir), "w") as fil:
+            fil.write(json.dumps(self.summary_model.project_tree(project_root), indent=4))
+
 
     def _render_index_page(self, project_root):
         with open(os.path.join("%s/index.html" % self.files_dir), "w") as fil:
@@ -53,14 +60,14 @@ class SummaryRenderer(object):
         for (fid, risk) in self.summary_model.fileids_with_risk(top=NUM_RISKIEST_FILES):
             fil.write("<tr>\n<td>%s</td>\n<td>%d</td>\n</tr>\n" % (self.summary_model.fpath(fid), int(risk)))
         fil.write("</table>")
-        
+
     def _render_riskiest_authors(self, fil):
         fil.write("<p>Top %d authors/groups by (bus_risk * knowledge)</p>" % NUM_RISKIEST_AUTHORS)
         fil.write("<table>\n<tr>\n<th>Author(s)</th>\n<th>Bus Risk * Knowledge</th>\n</tr>\n")
         for (authstr, risk) in self.summary_model.authorgroups_with_risk(top=NUM_RISKIEST_AUTHORS):
             fil.write("<tr>\n<td>%s</td>\n<td>%d</td>\n</tr>\n" % (authstr, int(risk)))
         fil.write("</table>")
-            
+
     def _create_files_dir(self):
         self.files_dir = os.path.join(self.output_dir, 'files')
 
@@ -69,9 +76,9 @@ class SummaryRenderer(object):
         except OSError as exc:
             if exc.errno == errno.EEXIST:
                 pass
-            else: 
+            else:
                 raise
-            
+
 
     def _render_file_page(self, file_id, fname):
         summarized_lines = self.summary_model.file_lines(file_id)
@@ -100,7 +107,7 @@ class SummaryRenderer(object):
         #risk_s = '<td width="100"><div style="width: %d%%; background-color: red; float: right;">%d</div></td>' % (int(risk_width), int(risk_width))
         #orphan_s = '<td width="100"><div style="width: %d%%; background-color: green;">%d</div></td>' % (int(orphan_width), int(orphan_width))
         risk_s = "<td>%d</td>" % risk_width
-        orphan_s = "<td>%d</td>" % orphan_width        
+        orphan_s = "<td>%d</td>" % orphan_width
         close_s = '</tr></table>'
         return ''.join([s, risk_s, orphan_s, close_s])
 
@@ -117,5 +124,5 @@ if __name__ == '__main__':
     summary_model = SummaryModel(conn)
     summary_renderer = SummaryRenderer(summary_model, output_dir)
     summary_renderer.render_all(project_root)
-    
-    
+
+

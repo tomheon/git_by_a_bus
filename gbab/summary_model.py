@@ -1,3 +1,4 @@
+from collections import defaultdict
 import os
 
 class SummaryModel(object):
@@ -21,7 +22,7 @@ class SummaryModel(object):
         parent_dir_id = 0
         for dirname in self._split_all_dirs(os.path.split(fname)[0]):
             parent_dir_id = self._find_or_create_dir(dirname, project_id, parent_dir_id)
-        
+
         file_id = self._create_file(os.path.split(fname)[1], parent_dir_id)
 
         for i, line_summary in enumerate(line_summaries):
@@ -53,7 +54,7 @@ class SummaryModel(object):
         select = "SELECT COUNT(*) FROM files;"
         self.cursor.execute(select, ())
         return self.cursor.fetchall()[0][0]
-        
+
     def authorgroups_with_risk(self, top=None):
         limit = ''
         if top:
@@ -101,6 +102,135 @@ class SummaryModel(object):
 
         return results
 
+    def project_tree(self, project):
+        project_id = self._find_or_create_project(project)
+
+        tree = defaultdict(lambda: {'name': 'root', 'files': {}, 'dirs': []})
+
+        # first fill in the directory structure, ignoring the files.
+        parentdirids = [0]
+        while parentdirids:
+            parentdirid = parentdirids.pop()
+            select = "SELECT dirid, dir FROM dirs WHERE parentdirid = ?;"
+            self.cursor.execute(select, (parentdirid,))
+            for dirrow in self.cursor.fetchall():
+                dirid, dirname = dirrow
+                tree[parentdirid]['dirs'].append(dirid)
+                tree[dirid]['name'] = dirname
+                parentdirids.append(dirid)
+
+        # then add the files
+        for (dirid, dirdict) in tree.items():
+            select = "SELECT fileid, fname FROM files WHERE dirid = ?;"
+            self.cursor.execute(select, (dirid,))
+            for filerow in self.cursor.fetchall():
+                fileid, fname = filerow
+                tree[dirid]['files'][fileid] = {'name': fname, 'author_risks': {}}
+            for (fileid, filedict) in tree[dirid]['files'].items():
+                select = """SELECT SUM(knowledge) as tot_knowledge,
+                                   SUM(risk) as tot_risk,
+                                   SUM(orphaned) as tot_orphaned
+                            FROM lines LEFT OUTER JOIN allocations
+                                 ON lines.lineid = allocations.lineid
+                            WHERE lines.fileid = ?
+                            GROUP BY lines.fileid"""
+                self.cursor.execute(select, (fileid,))
+                tot_knowledge, tot_risk, tot_orphaned = self.cursor.fetchone()
+                filedict['tot_knowledge'] = tot_knowledge
+                filedict['tot_risk'] = tot_risk
+                filedict['tot_orphaned'] = tot_orphaned
+
+            for (fileid, filedict) in tree[dirid]['files'].items():
+                select = """SELECT SUM(knowledge) as tot_knowledge,
+                                   SUM(risk) as tot_risk,
+                                   SUM(orphaned) as tot_orphaned,
+                                   authorsstr
+                            FROM lines LEFT OUTER JOIN allocations
+                                 ON lines.lineid = allocations.lineid
+                                 LEFT OUTER JOIN authorgroups
+                                 ON authorgroups.authorgroupid = allocations.authorgroupid
+                            WHERE lines.fileid = ?
+                            GROUP BY allocations.authorgroupid
+                            ORDER BY authorsstr"""
+                self.cursor.execute(select, (fileid,))
+                for riskrow in self.cursor.fetchall():
+                    tot_knowledge, tot_risk, tot_orphaned, authorsstr = riskrow
+                    author_risks = {}
+                    author_risks['tot_risk'] = tot_risk
+                    author_risks['tot_knowledge'] = tot_knowledge
+                    author_risks['tot_orphaned'] = tot_orphaned
+                    tree[dirid]['files'][fileid]['author_risks'][authorsstr] = author_risks
+
+
+
+        # then the lines
+        # for (dirid, dirdict) in tree.items():
+        #     for (fileid, fname) in dirdict['files'].items():
+        #         select = "SELECT lineid, linenum, line FROM lines WHERE fileid = ?;"
+        #         self.cursor.execute(select, (fileid,))
+        #         for linerow in self.cursor.fetchall():
+        #             lineid, linenum, line = linerow
+        #             tree[dirid]['files'][fileid]['lines'].append({'linenum': linenum,
+        #                                                           'text': line})
+
+        transformed_root = self._transform_node(tree, 0)
+        assert(len(transformed_root['dirs']) == 1)
+        root = transformed_root['dirs'][0]
+        project_tree = {'project_name': project,
+                        'root': root,
+                        'author_risks': {}}
+
+        select = """SELECT SUM(knowledge) as tot_knowledge,
+                           SUM(risk) as tot_risk,
+                           SUM(orphaned) as tot_orphaned,
+                           authorsstr
+                    FROM lines LEFT OUTER JOIN allocations
+                         ON lines.lineid = allocations.lineid
+                         LEFT OUTER JOIN files
+                         ON files.fileid = lines.fileid
+                         LEFT OUTER JOIN dirs
+                         ON dirs.dirid = files.dirid
+                         LEFT OUTER JOIN authorgroups
+                         ON authorgroups.authorgroupid = allocations.authorgroupid
+                         WHERE dirs.projectid = ?
+                         GROUP BY authorgroups.authorgroupid"""
+        self.cursor.execute(select, (project_id,))
+        for knowledgerow in self.cursor.fetchall():
+            authors_risk = {}
+            tot_knowledge, tot_risk, tot_orphaned, authorsstr = knowledgerow
+            authors_risk['tot_knowledge'] = tot_knowledge
+            authors_risk['tot_risk'] = tot_risk
+            authors_risk['tot_orphaned'] = tot_orphaned
+            project_tree['author_risks'][authorsstr] = authors_risk
+
+        select = """SELECT SUM(knowledge) as tot_knowledge,
+                           SUM(risk) as tot_risk,
+                           SUM(orphaned) as tot_orphaned
+                    FROM lines LEFT OUTER JOIN allocations
+                         ON lines.lineid = allocations.lineid
+                         LEFT OUTER JOIN files
+                         ON files.fileid = lines.fileid
+                         LEFT OUTER JOIN dirs
+                         ON dirs.dirid = files.dirid
+                         WHERE dirs.projectid = ?"""
+        self.cursor.execute(select, (project_id,))
+        tot_knowledge, tot_risk, tot_orphaned = self.cursor.fetchone()
+        project_tree['tot_knowledge'] = tot_knowledge
+        project_tree['tot_risk'] = tot_risk
+        project_tree['tot_orphaned'] = tot_orphaned
+
+        return project_tree
+
+    def _transform_node(self, tree, dirid):
+        dirdict = tree[dirid]
+        tmp_dirs = []
+        for childdirid in dirdict['dirs']:
+            tmp_dirs.append(self._transform_node(tree, childdirid))
+            del tree[childdirid]
+        dirdict['dirs'] = tmp_dirs
+        dirdict['files'] = [filedict for (fileid, filedict) in dirdict['files'].items()]
+        return dirdict
+
     def file_lines(self, file_id):
         select = "SELECT SUM(knowledge), SUM(risk), SUM(orphaned), line, lines.lineid FROM " + \
                  "lines LEFT OUTER JOIN allocations ON lines.lineid = allocations.lineid " + \
@@ -108,9 +238,9 @@ class SummaryModel(object):
         self.cursor.execute(select, (file_id,))
         return [(self._zero_if_none(row[0]),
                  self._zero_if_none(row[1]),
-                 self._zero_if_none(row[2]), 
+                 self._zero_if_none(row[2]),
                  row[3].encode('utf-8')) for row in self.cursor.fetchall()]
-             
+
     # implementation
 
     def _zero_if_none(self, val):
@@ -160,7 +290,7 @@ class SummaryModel(object):
             for author_id in author_ids:
                 self.cursor.execute(insert_join, (author_id, author_group_id))
         return author_group_id
-        
+
     def _find_or_create_author(self, author):
         insert = "INSERT OR IGNORE INTO authors (author) VALUES (?);"
         self.cursor.execute(insert, (author,))
@@ -202,7 +332,7 @@ class SummaryModel(object):
 
     def _split_all_dirs(self, dirname):
         all_dirs = []
-        
+
         last_split = None
         while True:
             while dirname.endswith(os.path.sep):
@@ -259,5 +389,5 @@ class SummaryModel(object):
                "CREATE INDEX IF NOT EXISTS linealloc_idx ON allocations (lineid);"]
         for s in sql:
             self.conn.execute(s)
-    
-    
+
+
