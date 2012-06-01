@@ -102,7 +102,7 @@ class SummaryModel(object):
 
         return results
 
-    def project_tree(self, project):
+    def project_summary(self, project):
         project_id = self._find_or_create_project(project)
 
         tree = defaultdict(lambda: {'name': 'root', 'files': {}, 'dirs': []})
@@ -139,6 +139,7 @@ class SummaryModel(object):
                 filedict['tot_knowledge'] = tot_knowledge
                 filedict['tot_risk'] = tot_risk
                 filedict['tot_orphaned'] = tot_orphaned
+                filedict['db_id'] = fileid
 
             for (fileid, filedict) in tree[dirid]['files'].items():
                 select = """SELECT SUM(knowledge) as tot_knowledge,
@@ -160,18 +161,6 @@ class SummaryModel(object):
                     author_risks['tot_knowledge'] = tot_knowledge
                     author_risks['tot_orphaned'] = tot_orphaned
                     tree[dirid]['files'][fileid]['author_risks'][authorsstr] = author_risks
-
-
-
-        # then the lines
-        # for (dirid, dirdict) in tree.items():
-        #     for (fileid, fname) in dirdict['files'].items():
-        #         select = "SELECT lineid, linenum, line FROM lines WHERE fileid = ?;"
-        #         self.cursor.execute(select, (fileid,))
-        #         for linerow in self.cursor.fetchall():
-        #             lineid, linenum, line = linerow
-        #             tree[dirid]['files'][fileid]['lines'].append({'linenum': linenum,
-        #                                                           'text': line})
 
         transformed_root = self._transform_node(tree, 0)
         assert(len(transformed_root['dirs']) == 1)
@@ -221,15 +210,90 @@ class SummaryModel(object):
 
         return project_tree
 
-    def _transform_node(self, tree, dirid):
-        dirdict = tree[dirid]
-        tmp_dirs = []
-        for childdirid in dirdict['dirs']:
-            tmp_dirs.append(self._transform_node(tree, childdirid))
-            del tree[childdirid]
-        dirdict['dirs'] = tmp_dirs
-        dirdict['files'] = [filedict for (fileid, filedict) in dirdict['files'].items()]
-        return dirdict
+    def file_summary(self, fileid):
+        file_tree = {'name': '',
+                     'author_risks': {},
+                     'tot_knowledge': None,
+                     'tot_risk': None,
+                     'tot_orphaned': None,
+                     'lines': []}
+        select = """SELECT SUM(knowledge) as tot_knowledge,
+                           SUM(risk) as tot_risk,
+                           SUM(orphaned) as tot_orphaned,
+                           authorsstr
+                    FROM lines LEFT OUTER JOIN allocations
+                         ON lines.lineid = allocations.lineid
+                         LEFT OUTER JOIN authorgroups
+                         ON authorgroups.authorgroupid = allocations.authorgroupid
+                         WHERE lines.fileid = ?
+                         GROUP BY authorgroups.authorgroupid"""
+        self.cursor.execute(select, (fileid,))
+        for knowledgerow in self.cursor.fetchall():
+            authors_risk = {}
+            tot_knowledge, tot_risk, tot_orphaned, authorsstr = knowledgerow
+            authors_risk['tot_knowledge'] = tot_knowledge
+            authors_risk['tot_risk'] = tot_risk
+            authors_risk['tot_orphaned'] = tot_orphaned
+            file_tree['author_risks'][authorsstr] = authors_risk
+
+        select = """SELECT SUM(knowledge) as tot_knowledge,
+                           SUM(risk) as tot_risk,
+                           SUM(orphaned) as tot_orphaned
+                    FROM lines LEFT OUTER JOIN allocations
+                         ON lines.lineid = allocations.lineid
+                         LEFT OUTER JOIN files
+                         ON files.fileid = lines.fileid
+                         WHERE lines.fileid = ?"""
+        self.cursor.execute(select, (fileid,))
+        tot_knowledge, tot_risk, tot_orphaned = self.cursor.fetchone()
+        file_tree['tot_knowledge'] = tot_knowledge
+        file_tree['tot_risk'] = tot_risk
+        file_tree['tot_orphaned'] = tot_orphaned
+
+        select = "SELECT fname FROM files WHERE fileid = ?;"
+        self.cursor.execute(select, (fileid,))
+        file_tree['name'] = self.cursor.fetchone()[0]
+
+        select = "SELECT lineid FROM lines WHERE fileid = ? ORDER BY linenum;"
+        self.cursor.execute(select, (fileid,))
+        lineids = [lineid for (lineid,) in self.cursor.fetchall()]
+
+        for lineid in lineids:
+            linedict = {'author_risks': {}}
+            select = """SELECT SUM(knowledge) as tot_knowledge,
+                               SUM(risk) as tot_risk,
+                               SUM(orphaned) as tot_orphaned,
+                               authorsstr
+                        FROM lines LEFT OUTER JOIN allocations
+                             ON lines.lineid = allocations.lineid
+                             LEFT OUTER JOIN authorgroups
+                             ON authorgroups.authorgroupid = allocations.authorgroupid
+                             WHERE lines.lineid = ?
+                        GROUP BY authorgroups.authorgroupid"""
+            self.cursor.execute(select, (lineid,))
+            for knowledgerow in self.cursor.fetchall():
+                author_risks = {}
+                tot_knowledge, tot_risk, tot_orphaned, authorsstr = knowledgerow
+                author_risks['tot_knowledge'] = tot_knowledge
+                author_risks['tot_risk'] = tot_risk
+                author_risks['tot_orphaned'] = tot_orphaned
+                linedict['author_risks'][authorsstr] = author_risks
+
+            select = """SELECT SUM(knowledge) as tot_knowledge,
+                               SUM(risk) as tot_risk,
+                               SUM(orphaned) as tot_orphaned
+                        FROM lines LEFT OUTER JOIN allocations
+                             ON lines.lineid = allocations.lineid
+                             WHERE lines.lineid = ?"""
+            self.cursor.execute(select, (lineid,))
+            tot_knowledge, tot_risk, tot_orphaned = self.cursor.fetchone()
+            linedict['tot_knowledge'] = tot_knowledge
+            linedict['tot_risk'] = tot_risk
+            linedict['tot_orphaned'] = tot_orphaned
+
+            file_tree['lines'].append(linedict)
+
+        return file_tree
 
     def file_lines(self, file_id):
         select = "SELECT SUM(knowledge), SUM(risk), SUM(orphaned), line, lines.lineid FROM " + \
@@ -242,6 +306,16 @@ class SummaryModel(object):
                  row[3].encode('utf-8')) for row in self.cursor.fetchall()]
 
     # implementation
+
+    def _transform_node(self, tree, dirid):
+        dirdict = tree[dirid]
+        tmp_dirs = []
+        for childdirid in dirdict['dirs']:
+            tmp_dirs.append(self._transform_node(tree, childdirid))
+            del tree[childdirid]
+        dirdict['dirs'] = tmp_dirs
+        dirdict['files'] = [filedict for (fileid, filedict) in dirdict['files'].items()]
+        return dirdict
 
     def _zero_if_none(self, val):
         if val is None:
