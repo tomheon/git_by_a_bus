@@ -11,6 +11,10 @@ def summarize(output_dir, queue):
     """
     db_fname = os.path.join(output_dir, 'summary.db')
     conn = sqlite3.connect(db_fname)
+    cursor = conn.cursor()
+    cursor.execute('PRAGMA journal_mode = OFF')
+    cursor.execute('PRAGMA synchronous = OFF')
+    cursor.close()
     summary_model = SummaryModel(conn)
     
     while True:
