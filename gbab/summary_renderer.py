@@ -1,8 +1,13 @@
+import codecs
 import math
 import os
 import errno
 import cgi
 import json
+
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import guess_lexer_for_filename
 
 # max number of risky authors to write in summmary
 NUM_RISKIEST_AUTHORS = 10
@@ -21,6 +26,7 @@ class SummaryRenderer(object):
         self._create_files_dir()
         self._render_summary_json(project_root)
         self._render_file_json(project_root)
+        self._render_src(project_root)
 
     # implementation
 
@@ -32,6 +38,28 @@ class SummaryRenderer(object):
         for fileid, fname in self.summary_model.project_files(project_root):
             with open(os.path.join(self.files_dir, '%s.json' % str(fileid)), "wb") as fil:
                 fil.write(json.dumps(self.summary_model.file_summary(fileid), indent=4))
+
+    def _render_src(self, project_root):
+        formatter = HtmlFormatter(linenos=True,
+                                  lineanchors='gbab')
+
+        with codecs.open(os.path.join(self.files_dir,
+                                      "pygments.css"),
+                                      "wb",
+                                      encoding="utf-8") as stylefil:
+                    stylefil.write(formatter.get_style_defs())
+
+        for fileid, fname in self.summary_model.project_files(project_root):
+            with codecs.open(os.path.join(self.files_dir, '%s.html' % str(fileid)),
+                             "wb",
+                             encoding="utf-8") as fil:
+                lines = self.summary_model.file_lines(fileid)
+                body = '\n'.join(lines)
+                lexer = guess_lexer_for_filename(fname, body)
+                highlight('\n'.join(lines),
+                          lexer,
+                          formatter,
+                          outfile=fil)
 
     def _create_files_dir(self):
         self.files_dir = os.path.join(self.output_dir, 'files')

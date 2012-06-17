@@ -298,14 +298,12 @@ class SummaryModel(object):
         return file_tree
 
     def file_lines(self, file_id):
-        select = "SELECT SUM(knowledge), SUM(risk), SUM(orphaned), line, lines.lineid FROM " + \
-                 "lines LEFT OUTER JOIN allocations ON lines.lineid = allocations.lineid " + \
-                 "WHERE lines.fileid = ? GROUP BY lines.lineid ORDER BY linenum;"
+        select = """SELECT line
+                    FROM lines
+                    WHERE lines.fileid = ?
+                    ORDER BY linenum;"""
         self.cursor.execute(select, (file_id,))
-        return [(self._zero_if_none(row[0]),
-                 self._zero_if_none(row[1]),
-                 self._zero_if_none(row[2]),
-                 row[3].encode('utf-8')) for row in self.cursor.fetchall()]
+        return [row[0].encode('utf-8') for row in self.cursor.fetchall()]
 
     # implementation
 
