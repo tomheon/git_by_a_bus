@@ -135,11 +135,13 @@ class SummaryModel(object):
                             WHERE lines.fileid = ?
                             GROUP BY lines.fileid"""
                 self.cursor.execute(select, (fileid,))
-                tot_knowledge, tot_risk, tot_orphaned = self.cursor.fetchone()
-                filedict['tot_knowledge'] = tot_knowledge
-                filedict['tot_risk'] = tot_risk
-                filedict['tot_orphaned'] = tot_orphaned
-                filedict['db_id'] = fileid
+                row = self.cursor.fetchone()
+                if row:
+                    tot_knowledge, tot_risk, tot_orphaned = row
+                    filedict['tot_knowledge'] = tot_knowledge
+                    filedict['tot_risk'] = tot_risk
+                    filedict['tot_orphaned'] = tot_orphaned
+                    filedict['db_id'] = fileid
 
             for (fileid, filedict) in tree[dirid]['files'].items():
                 select = """SELECT SUM(knowledge) as tot_knowledge,
