@@ -2,7 +2,8 @@
 
 ## History
 
-Git by a Bus was developed at HubSpot.
+I originally developed Git by a Bus at HubSpot, who kindly allowed me
+to open source it.
 
 Motivation and description of the algorithm are here:
 
@@ -10,10 +11,8 @@ http://dev.hubspot.com/bid/57694/Git-by-a-Bus
 
 ## Bugs
 
-If you find any, let me know on github or by email at {first
-initial}{last name}@{my company}.com, all lowercase.
-
-My name is Edmund Jorgensen, and I work at HubSpot.
+If you find any, let me know on github or by email at
+edmund@hut8labs.com
 
 ## Installation and Dependencies
 
@@ -91,4 +90,3 @@ svn bridge puts a fair amount of load on the svn server during
 conversion as well, so for large and busy repos you might want to
 consider making a local copy with svnadmin hotcopy and then converting
 to git from the copy.
-
