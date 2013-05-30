@@ -8,6 +8,7 @@ output_dir/index.html
 import sys
 import os
 import math
+import hashlib
 
 from optparse import OptionParser
 
@@ -259,7 +260,7 @@ def fname_linker(fname):
     return "<a href=\"%s\">%s</a>" % (fname_fname(fname), fname)    
 
 def dev_fname(dev):
-    return os.path.join('devs', "%s.html" % dev)
+    return os.path.join('devs', "%s.html" % hashlib.md5(dev).hexdigest())
 
 def dev_linker(dev):
     return "<a href=\"%s\">%s</a>" % (dev_fname(dev), dev)
