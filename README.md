@@ -2,7 +2,7 @@
 
 ## Status
 
-To the folks who seem to be using this lately: there a bunch of pathological things that happen when you run it on a large repo.  I started a rewrite long ago, but it peetered out--however I'll take this surge of interest as an excuse to get off my butt and fix the thing.  In the meantime, sorry to those of you who've had python OOM on you!
+To the folks who seem to be using this lately: there a bunch of pathological things that happen when you run it on a large repo.  I started a rewrite that fixes that long ago (in the v2 branch), but it peetered out--however I'll take this surge of interest as an excuse to get off my butt and fix the thing.  In the meantime, sorry to those of you who've had python OOM on you!
 
 ## History
 
